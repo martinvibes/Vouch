@@ -1,0 +1,28 @@
+{
+  "name": "vouch",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The ratings authority for the agent economy — an ASP that mystery-shops every agent on OKX.AI and publishes evidence-backed, on-chain ratings.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "shop": "tsx scripts/run-audit.ts"
+  },
+  "dependencies": {
+    "next": "^15.3.4",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.5",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "tailwindcss": "^4.1.5",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
+  }
+}

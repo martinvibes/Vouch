@@ -1,0 +1,234 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   VOUCH — The ratings authority for the agent economy.
+   Design language: dark editorial canvas · gold certification seal ·
+   a semantic letter-grade colour scale that IS the visual vocabulary.
+   ========================================================================== */
+
+@theme {
+  /* Canvas & surfaces — near-black, faintly warm-neutral (seal-on-paper, inverted) */
+  --color-ink: #0a0a0c;
+  --color-ink-2: #0e0e11;
+  --color-surface: #141419;
+  --color-elevated: #1a1a21;
+  --color-line: rgba(244, 241, 234, 0.09);
+  --color-line-strong: rgba(244, 241, 234, 0.16);
+
+  /* Type colours — warm paper-white on ink */
+  --color-fg: #f4f1ea;
+  --color-fg-dim: #a1a0aa;
+  --color-fg-mute: #66656f;
+
+  /* Signature — certification gold (authority, the seal) */
+  --color-gold: #e6b23c;
+  --color-gold-bright: #f6ce6b;
+  --color-gold-deep: #a9791e;
+
+  /* Grade scale — the semantic core. Green → cyan → gold → orange → red */
+  --color-grade-a: #43d6a0;
+  --color-grade-b: #5bc8d8;
+  --color-grade-c: #e6b23c;
+  --color-grade-d: #e8894a;
+  --color-grade-f: #e5484d;
+
+  /* Fonts (bound to next/font CSS variables in layout.tsx) */
+  --font-display: var(--font-instrument-serif), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-ink);
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+    /* Ambient: a single restrained gold aura at the crown, over a faint grid */
+    background-image:
+      radial-gradient(120% 80% at 50% -10%, rgba(230, 178, 60, 0.1), transparent 55%),
+      linear-gradient(to bottom, rgba(244, 241, 234, 0.02) 1px, transparent 1px),
+      linear-gradient(to right, rgba(244, 241, 234, 0.02) 1px, transparent 1px);
+    background-size: 100% 100%, 64px 64px, 64px 64px;
+    background-attachment: fixed;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-sans);
+    letter-spacing: -0.02em;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  ::selection {
+    background: rgba(230, 178, 60, 0.28);
+    color: #fff;
+  }
+
+  a { color: inherit; text-decoration: none; }
+
+  :focus-visible {
+    outline: 2px solid var(--color-gold);
+    outline-offset: 2px;
+    border-radius: 3px;
+  }
+}
+
+@layer components {
+  /* -- Editorial serif, used with restraint -------------------------------- */
+  .serif {
+    font-family: var(--font-display);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+
+  /* -- Eyebrow label — structural, monospace, gold ------------------------- */
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--color-gold);
+    font-weight: 500;
+  }
+
+  /* -- Panels — quiet glass, hairline border ------------------------------- */
+  .panel {
+    background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--color-line);
+    border-radius: 14px;
+  }
+
+  .panel-flat {
+    background: var(--color-ink-2);
+    border: 1px solid var(--color-line);
+    border-radius: 14px;
+  }
+
+  /* -- Grade token — the semantic core. Set --g to a grade colour ---------- */
+  .grade {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    line-height: 1;
+    color: var(--g, var(--color-gold));
+    background: color-mix(in srgb, var(--g, var(--color-gold)) 13%, transparent);
+    border: 1px solid color-mix(in srgb, var(--g, var(--color-gold)) 42%, transparent);
+    border-radius: 8px;
+    letter-spacing: -0.02em;
+  }
+  .grade-a { --g: var(--color-grade-a); }
+  .grade-b { --g: var(--color-grade-b); }
+  .grade-c { --g: var(--color-grade-c); }
+  .grade-d { --g: var(--color-grade-d); }
+  .grade-f { --g: var(--color-grade-f); }
+
+  /* -- Pill — small status marker ------------------------------------------ */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 11px;
+    border-radius: 999px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.04em;
+    border: 1px solid var(--color-line-strong);
+    color: var(--color-fg-dim);
+    background: rgba(244, 241, 234, 0.03);
+  }
+  .pill-live { color: var(--color-grade-a); border-color: color-mix(in srgb, var(--color-grade-a) 40%, transparent); }
+  .pill-live .dot { background: var(--color-grade-a); box-shadow: 0 0 10px var(--color-grade-a); }
+  .dot { width: 7px; height: 7px; border-radius: 999px; background: currentColor; }
+
+  /* -- Buttons ------------------------------------------------------------- */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    height: 46px;
+    padding: 0 22px;
+    border-radius: 11px;
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: transform 120ms ease, background 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+  }
+  .btn-primary {
+    background: linear-gradient(180deg, var(--color-gold-bright), var(--color-gold));
+    color: #241a05;
+    box-shadow: 0 8px 30px rgba(230, 178, 60, 0.22);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(230, 178, 60, 0.34); }
+  .btn-ghost {
+    background: rgba(244, 241, 234, 0.03);
+    border-color: var(--color-line-strong);
+    color: var(--color-fg);
+  }
+  .btn-ghost:hover { border-color: var(--color-gold-deep); background: rgba(230, 178, 60, 0.06); }
+
+  /* -- Mono evidence receipt ---------------------------------------------- */
+  .receipt {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--color-fg-dim);
+    background: var(--color-ink);
+    border: 1px dashed var(--color-line-strong);
+    border-radius: 10px;
+  }
+  .hash { color: var(--color-gold); }
+}
+
+@layer utilities {
+  .text-gradient-gold {
+    background: linear-gradient(180deg, #fff 0%, var(--color-gold) 130%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .wrap { max-width: 1140px; margin-inline: auto; padding-inline: 24px; }
+  .wrap-narrow { max-width: 860px; margin-inline: auto; padding-inline: 24px; }
+
+  /* Seal stamp-down entrance */
+  @keyframes stamp {
+    0% { transform: scale(1.6) rotate(-14deg); opacity: 0; filter: blur(3px); }
+    60% { transform: scale(0.94) rotate(-8deg); opacity: 1; filter: blur(0); }
+    100% { transform: scale(1) rotate(-8deg); opacity: 1; }
+  }
+  .animate-stamp { animation: stamp 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+  @keyframes spin-slow { to { transform: rotate(360deg); } }
+  .animate-spin-slow { animation: spin-slow 40s linear infinite; }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .animate-rise { animation: rise 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
