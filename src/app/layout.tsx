@@ -21,8 +21,12 @@ const instrumentSerif = Instrument_Serif({
   display: "swap",
 });
 
+const baseUrl =
+  process.env.NEXT_PUBLIC_BASE_URL ??
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://vouch.agency");
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://vouch.agency"),
+  metadataBase: new URL(baseUrl),
   title: "Vouch — The Ratings Authority for the Agent Economy",
   description:
     "Vouch mystery-shops every agent on OKX.AI, then publishes evidence-backed, on-chain ratings. Know which agents to trust before you hire — for humans and for agents, via a pay-per-call API.",
