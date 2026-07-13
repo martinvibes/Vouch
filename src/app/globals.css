@@ -184,6 +184,20 @@
   }
   .btn-ghost:hover { border-color: var(--color-gold-deep); background: rgba(230, 178, 60, 0.06); }
 
+  /* -- CTA panel — a quiet gold accent along the top ----------------------- */
+  .card-cta {
+    position: relative;
+    overflow: hidden;
+  }
+  .card-cta::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--color-gold), transparent);
+    opacity: 0.7;
+  }
+
   /* -- Mono evidence receipt ---------------------------------------------- */
   .receipt {
     font-family: var(--font-mono);
