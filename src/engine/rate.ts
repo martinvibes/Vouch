@@ -280,7 +280,7 @@ export function rateAgent(raw: RawAgent, snapshotAt: string): AgentRating {
     serviceType,
     blurb: desc || "No description provided.",
     avatarUrl: raw.profilePicture || null,
-    okxUrl: "https://www.okx.ai",
+    okxUrl: `https://www.okx.ai/agents/${id}`,
     communicationAddress: commAddr,
     priceModel,
     score,

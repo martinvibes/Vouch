@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AgentAvatar } from "./AgentAvatar";
 import { GradeBadge } from "./GradeBadge";
@@ -26,13 +26,26 @@ export interface LeaderRow {
   avatarUrl: string | null;
 }
 
-const PAGE = 40;
+const PAGE_SIZE = 20;
 
 function demand(row: LeaderRow): string {
   if (row.soldCount && row.soldCount > 0) {
     return `${row.soldCount.toLocaleString("en-US")} job${row.soldCount === 1 ? "" : "s"}`;
   }
   return "Unproven";
+}
+
+/** Windowed page numbers: 1 … p-1 p p+1 … last, with gaps as -1. */
+function pageWindow(current: number, total: number): number[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const out = new Set<number>([1, total, current, current - 1, current + 1]);
+  const pages = [...out].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b);
+  const withGaps: number[] = [];
+  for (let i = 0; i < pages.length; i++) {
+    if (i > 0 && pages[i] - pages[i - 1] > 1) withGaps.push(-1);
+    withGaps.push(pages[i]);
+  }
+  return withGaps;
 }
 
 export function Leaderboard({
@@ -45,7 +58,8 @@ export function Leaderboard({
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState<Category | "all">("all");
   const [provenOnly, setProvenOnly] = useState(false);
-  const [visible, setVisible] = useState(PAGE);
+  const [page, setPage] = useState(1);
+  const boardRef = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -57,11 +71,21 @@ export function Leaderboard({
     });
   }, [rows, query, cat, provenOnly]);
 
-  const shown = filtered.slice(0, visible);
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const current = Math.min(page, pageCount);
+  const start = (current - 1) * PAGE_SIZE;
+  const shown = filtered.slice(start, start + PAGE_SIZE);
 
+  // Any filter change resets to page 1.
   function reset(next: () => void) {
     next();
-    setVisible(PAGE);
+    setPage(1);
+  }
+
+  function goTo(p: number) {
+    setPage(Math.min(Math.max(1, p), pageCount));
+    // Keep the board in view so paging doesn't strand the user mid-scroll.
+    boardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   return (
@@ -116,7 +140,7 @@ export function Leaderboard({
       </div>
 
       {/* Board */}
-      <div className="card-stamp overflow-hidden">
+      <div ref={boardRef} className="card-stamp overflow-hidden scroll-mt-24">
         <div className="hidden grid-cols-[52px_1fr_140px_180px_60px] items-center gap-4 border-b border-line px-5 py-3 font-mono text-[0.68rem] uppercase tracking-[0.16em] text-ink-mute md:grid">
           <span>Rank</span>
           <span>Agent</span>
@@ -180,16 +204,53 @@ export function Leaderboard({
         )}
       </div>
 
-      {/* Count + load more */}
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm text-ink-mute">
-        <span className="font-mono">
-          Showing {shown.length} of {filtered.length}
-          {filtered.length !== rows.length ? ` (filtered from ${rows.length})` : " agents"}
+      {/* Count + pagination */}
+      <div className="mt-5 flex flex-col items-center justify-between gap-4 sm:flex-row">
+        <span className="order-2 font-mono text-xs text-ink-mute sm:order-1">
+          {filtered.length === 0
+            ? "No agents"
+            : `Showing ${start + 1}–${start + shown.length} of ${filtered.length}${
+                filtered.length !== rows.length ? ` (filtered from ${rows.length})` : ""
+              }`}
         </span>
-        {visible < filtered.length && (
-          <button onClick={() => setVisible((v) => v + PAGE)} className="btn btn-ghost h-10 px-5 text-sm">
-            Show more
-          </button>
+
+        {pageCount > 1 && (
+          <nav className="order-1 flex items-center gap-1 sm:order-2" aria-label="Leaderboard pages">
+            <button
+              onClick={() => goTo(current - 1)}
+              disabled={current === 1}
+              className="grid h-9 w-9 place-items-center rounded-lg border border-line-strong text-ink-soft transition-colors hover:border-ink disabled:opacity-40 disabled:hover:border-line-strong"
+              aria-label="Previous page"
+            >
+              ←
+            </button>
+            {pageWindow(current, pageCount).map((p, i) =>
+              p === -1 ? (
+                <span key={`gap-${i}`} className="px-1.5 font-mono text-sm text-ink-mute">…</span>
+              ) : (
+                <button
+                  key={p}
+                  onClick={() => goTo(p)}
+                  aria-current={p === current ? "page" : undefined}
+                  className={`h-9 min-w-9 rounded-lg border px-2 font-mono text-sm tabular-nums transition-colors ${
+                    p === current
+                      ? "border-transparent bg-ink text-bg"
+                      : "border-line-strong text-ink-soft hover:border-ink"
+                  }`}
+                >
+                  {p}
+                </button>
+              ),
+            )}
+            <button
+              onClick={() => goTo(current + 1)}
+              disabled={current === pageCount}
+              className="grid h-9 w-9 place-items-center rounded-lg border border-line-strong text-ink-soft transition-colors hover:border-ink disabled:opacity-40 disabled:hover:border-line-strong"
+              aria-label="Next page"
+            >
+              →
+            </button>
+          </nav>
         )}
       </div>
     </div>

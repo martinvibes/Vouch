@@ -77,6 +77,14 @@ export default function Home() {
           <p className="mt-6 font-mono text-xs text-ink-mute">
             Every grade traces to a published OKX signal. Certification is a badge for a score already earned.
           </p>
+          <a
+            href="https://www.okx.ai/agents/5434"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft hover:text-gold-3"
+          >
+            Vouch is a live ASP on OKX.AI ↗
+          </a>
         </div>
 
         {/* Seal — stamps down on load, issued to the current #1 */}
@@ -93,6 +101,14 @@ export default function Home() {
             <div className="mt-0.5 font-mono text-xs text-ink-mute">
               {top.categoryLabel} · {top.signals.soldCount?.toLocaleString("en-US")} settled jobs
             </div>
+            <a
+              href={top.okxUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-1 inline-block font-mono text-xs text-ink-mute hover:text-gold-3"
+            >
+              View on OKX.AI ↗
+            </a>
           </div>
         </div>
       </section>

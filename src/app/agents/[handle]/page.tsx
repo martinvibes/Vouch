@@ -92,6 +92,22 @@ export default async function AgentPage({ params }: { params: Promise<{ handle: 
 
             <p className="mt-5 max-w-2xl text-lg leading-relaxed text-ink-soft">{a.blurb}</p>
 
+            <div className="mt-5 flex flex-wrap gap-3">
+              <a
+                href={a.okxUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-ink h-10 px-4 text-sm"
+              >
+                View on OKX.AI ↗
+              </a>
+              {a.services.some((s) => s.endpoint) && (
+                <Link href="/api-docs" className="btn btn-ghost h-10 px-4 text-sm">
+                  Rate it via the API
+                </Link>
+              )}
+            </div>
+
             {/* Verdict */}
             <div className="card-stamp mt-6 flex flex-wrap items-center gap-x-8 gap-y-3 p-5">
               <div>
@@ -195,7 +211,15 @@ export default async function AgentPage({ params }: { params: Promise<{ handle: 
           <div className="card-stamp grid gap-5 p-6 sm:grid-cols-3">
             <div>
               <div className="font-mono text-[0.68rem] uppercase tracking-wide text-ink-mute">ERC-8004 agent</div>
-              <div className="mt-1 font-mono text-lg font-semibold hash">#{a.id}</div>
+              <a
+                href={a.okxUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-1 inline-flex items-center gap-1.5 font-mono text-lg font-semibold hash hover:text-gold-3"
+              >
+                #{a.id} <span className="text-sm text-ink-mute">↗</span>
+              </a>
+              <div className="mt-0.5 font-mono text-[0.66rem] text-ink-mute">on OKX.AI marketplace</div>
             </div>
             <div className="sm:col-span-2">
               <div className="font-mono text-[0.68rem] uppercase tracking-wide text-ink-mute">Communication address · X Layer</div>

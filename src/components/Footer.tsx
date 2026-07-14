@@ -35,11 +35,29 @@ export function Footer() {
         <div>
           <div className="eyebrow mb-4">On-chain identity</div>
           <ul className="space-y-2.5 text-sm text-ink-soft">
-            <li>ERC-8004 ASP · <span className="hash font-mono">#{ASP_ID}</span></li>
+            <li>
+              ERC-8004 ASP ·{" "}
+              <a
+                href={`https://www.okx.ai/agents/${ASP_ID}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hash font-mono hover:text-gold-3"
+              >
+                #{ASP_ID} ↗
+              </a>
+            </li>
             <li className="font-mono text-xs text-ink-mute">{ASP_ADDR.slice(0, 10)}…{ASP_ADDR.slice(-8)}</li>
             <li>X Layer · escrow + x402</li>
           </ul>
-          <p className="mt-5 text-xs text-ink-mute">OKX.AI Genesis Hackathon · 2026</p>
+          <a
+            href={`https://www.okx.ai/agents/${ASP_ID}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-ink hover:text-gold-3"
+          >
+            View Vouch on OKX.AI ↗
+          </a>
+          <p className="mt-4 text-xs text-ink-mute">OKX.AI Genesis Hackathon · 2026</p>
         </div>
       </div>
       <div className="border-t border-line">
