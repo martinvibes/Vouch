@@ -51,6 +51,29 @@ Tailwind v4, pnpm.
 
 ## Log
 
+### 2026-07-14 — /methodology reconceived as a live instrument ✅
+Requested by Martin: "change the concept of everything ... the whole /methodology
+page" — not tweaks. New concept: **the methodology as an instrument you drive**,
+not a document you read.
+- **Extracted the scorer** to `src/engine/score.ts` (`scoreSignals(input)`) — now
+  the ONE home for the grading math. `rate.ts` calls it; the methodology grader
+  calls the *same* function, so what visitors play with literally grades the
+  board. Verified distribution byte-for-byte unchanged: **S:6 A:38 B:60 C:68
+  D:101 F:4**, 44 certified, 107 proven.
+- **`src/components/MethodologyGrader.tsx`** (new client instrument): dial the six
+  signals (log-scaled settled-jobs slider, feedback/security toggles+sliders,
+  online, service/profile/priced/endpoint/avatar/identity/xlayer) → live Seal +
+  grade + score, per-signal "points earned / ceiling" bars (teaches the weighting
+  — traction leads), and an **honesty-cap rail** that highlights the binding cap.
+  Signature moment: the "blend NN ⟶ capped NN" readout. Presets load 4 REAL board
+  agents (S/B/D/F) + a blank slate; each reproduces its exact board grade.
+- **`/methodology` page** rebuilt around it: hero "Don't take our word for it —
+  run the engine", instrument as centerpiece, then tightened reference (weight
+  grid, grade scale, three rules, snapshot).
+- **CDP-verified** light + dark + mobile(390, no overflow): load S → toggle Buyer
+  feedback OFF → blend 86 clamps to 74, grade **S→B**, "Unproven — capped at B"
+  shown BINDING. `next build` green (methodology 5.88 kB), tsc clean.
+
 ### 2026-07-14 — UX round ✅ (commit d2fca7d, live on prod)
 Requested by Martin: OKX deep links, fix leaderboard endless-scroll, reconcept
 Guard, polish, keep this worklog. All done + CDP-verified + deployed:

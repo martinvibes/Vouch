@@ -2,18 +2,20 @@ import type {
   AgentRating,
   AgentSignals,
   Category,
-  Confidence,
   CriterionScore,
   Evidence,
   RatedService,
   ServiceType,
 } from "@/lib/types";
 import { CATEGORY_LABELS } from "@/lib/rubrics";
-import { toGrade, CERTIFY_THRESHOLD } from "@/lib/grade";
+import { scoreSignals } from "./score";
 
 /**
  * The real scorer: one raw OKX.AI marketplace record → one graded AgentRating.
- * Pure and deterministic. Every number traces back to a published signal.
+ * Pure and deterministic. Every number traces back to a published signal. The
+ * numeric grading itself lives in `scoreSignals` (shared with the public
+ * methodology grader); this maps a raw record into it and dresses the result
+ * with evidence, services, and identity.
  */
 
 export interface RawService {
@@ -54,23 +56,6 @@ const CATEGORY_MAP: Record<string, Category> = {
   WORLD_CUP: "prediction",
   OTHER: "other",
 };
-
-const UNPROVEN_RELIABILITY_PRIOR = 46; // no feedback → provisional, mid-low
-const UNKNOWN_SECURITY_PRIOR = 55; // not scanned → mild neutral
-const TRACTION_CEIL = 1500; // ~ the busiest agent in the market; anchors the log scale
-
-const clamp = (n: number, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, n));
-
-/**
- * Proven demand, log-scaled. soldCount is the market's own verdict — the number
- * of jobs buyers actually paid for and completed. It's the one signal that
- * truly separates a workhorse (1,400+ jobs) from a listing with a single happy
- * customer, so it carries real weight. 0 jobs → 0; the busiest agents → ~100.
- */
-function tractionScore(sold: number): number {
-  if (sold <= 0) return 0;
-  return clamp(12 + (Math.log10(sold + 1) / Math.log10(TRACTION_CEIL)) * 88);
-}
 
 export function slugify(name: string, id: string): string {
   const s = (name || "")
@@ -126,64 +111,29 @@ export function rateAgent(raw: RawAgent, snapshotAt: string): AgentRating {
 
   const soldCount = typeof raw.soldCount === "number" && raw.soldCount > 0 ? raw.soldCount : 0;
 
-  // ---- Component scores (0..100) ----
-  const tracScore = tractionScore(soldCount);
-  const relScore = feedbackRate ?? UNPROVEN_RELIABILITY_PRIOR;
-  const secScore = securityRate != null ? (securityRate / 5) * 100 : UNKNOWN_SECURITY_PRIOR;
-
-  let serviceScore = 20;
-  if (serviceCount >= 1) serviceScore = 66;
-  if (serviceCount >= 2) serviceScore = 78;
-  if (serviceCount >= 3) serviceScore = 86;
-  if (pricedFees.length) serviceScore += 8;
-  if (services.some((s) => s.endpoint)) serviceScore += 6;
-  serviceScore = clamp(serviceScore);
-
-  const availScore = online ? 100 : 40;
-
-  let transScore = 30;
-  if (desc.length >= 140) transScore += 32;
-  else if (desc.length >= 60) transScore += 20;
-  else if (desc.length >= 20) transScore += 8;
-  if (hasAvatar) transScore += 20;
-  if (commAddr) transScore += 14;
-  if (raw.chainIndex === 196) transScore += 4;
-  transScore = clamp(transScore);
-
-  // ---- Weighted aggregate (rubric weights) ----
-  // Proven demand + buyer reliability together are ~half the grade: an
-  // authority weights what buyers actually did, not just what's listed.
-  const raw100 =
-    0.24 * tracScore +
-    0.22 * relScore +
-    0.2 * secScore +
-    0.16 * serviceScore +
-    0.08 * availScore +
-    0.1 * transScore;
-
-  const proven = feedbackRate != null;
-  const hasSec = securityRate != null;
-  const confidence: Confidence = proven && hasSec ? "high" : proven || hasSec ? "medium" : "low";
-
-  // ---- Honesty caps ----
-  let cap = 100;
-  if (!proven) cap = Math.min(cap, 74); // unproven can't exceed a B
-  if (confidence !== "high") cap = Math.min(cap, 88); // S is reserved for high-confidence
-  if (!online) cap = Math.min(cap, 85);
-  if (securityRate != null && securityRate < 2) cap = Math.min(cap, 50);
-  if (securityRate != null && securityRate < 1) cap = Math.min(cap, 40);
-
-  const score = Math.round(clamp(Math.min(raw100, cap)));
-  const grade = toGrade(score);
-  const certified = proven && score >= CERTIFY_THRESHOLD;
+  // ---- Grade via the shared scoring core (same engine the /methodology grader runs) ----
+  const result = scoreSignals({
+    soldCount,
+    feedbackRate,
+    securityRate,
+    online,
+    serviceCount,
+    pricedCount: pricedFees.length,
+    hasEndpoint: services.some((s) => !!s.endpoint),
+    descLen: desc.length,
+    hasAvatar,
+    hasComm: !!commAddr,
+    onXLayer: raw.chainIndex === 196,
+  });
+  const { components, score, grade, proven, confidence, certified } = result;
 
   const criteria: CriterionScore[] = [
-    { key: "traction", score: Math.round(tracScore) },
-    { key: "reliability", score: Math.round(relScore) },
-    { key: "security", score: Math.round(secScore) },
-    { key: "service", score: Math.round(serviceScore) },
-    { key: "availability", score: Math.round(availScore) },
-    { key: "transparency", score: Math.round(transScore) },
+    { key: "traction", score: Math.round(components.traction) },
+    { key: "reliability", score: Math.round(components.reliability) },
+    { key: "security", score: Math.round(components.security) },
+    { key: "service", score: Math.round(components.service) },
+    { key: "availability", score: Math.round(components.availability) },
+    { key: "transparency", score: Math.round(components.transparency) },
   ];
 
   // ---- Evidence (real receipts) ----
@@ -219,7 +169,7 @@ export function rateAgent(raw: RawAgent, snapshotAt: string): AgentRating {
         },
   );
   evidence.push(
-    hasSec
+    securityRate != null
       ? {
           label: "Security scan",
           value: `${securityRate}/5`,
