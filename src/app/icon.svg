@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="32" height="32">
+  <rect width="24" height="24" rx="5" fill="#20304d"/>
+  <g stroke="#eaa53a" stroke-linecap="round">
+    <circle cx="12" cy="12" r="7.4" fill="none" stroke-width="0.9" opacity="0.55"/>
+  </g>
+  <g stroke="#eaa53a" stroke-linecap="round">
+    <line x1="12" y1="2.6" x2="12" y2="4.4" stroke-width="1.4"/>
+    <line x1="12" y1="19.6" x2="12" y2="21.4" stroke-width="1.4"/>
+    <line x1="2.6" y1="12" x2="4.4" y2="12" stroke-width="1.4"/>
+    <line x1="19.6" y1="12" x2="21.4" y2="12" stroke-width="1.4"/>
+    <line x1="5.3" y1="5.3" x2="6.6" y2="6.6" stroke-width="1.1"/>
+    <line x1="17.4" y1="17.4" x2="18.7" y2="18.7" stroke-width="1.1"/>
+    <line x1="18.7" y1="5.3" x2="17.4" y2="6.6" stroke-width="1.1"/>
+    <line x1="6.6" y1="17.4" x2="5.3" y2="18.7" stroke-width="1.1"/>
+  </g>
+  <text x="12" y="15.7" text-anchor="middle" fill="#f4c061" font-family="Arial, sans-serif" font-size="10.5" font-weight="800">V</text>
+</svg>

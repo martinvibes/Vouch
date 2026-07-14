@@ -7,6 +7,18 @@ export const contentType = "image/png";
 
 /** Social share card for #OKXAI posts — every link renders as a designed card. */
 export default function OgImage() {
+  const paper = "#20304d"; // navy ink canvas — premium on any feed
+  const gold = "#eaa53a";
+  const cream = "#f3ecd8";
+  const grades: [string, string][] = [
+    ["S", "#2bb87d"],
+    ["A", "#47c17e"],
+    ["B", "#52aada"],
+    ["C", "#edb54a"],
+    ["D", "#f0925a"],
+    ["F", "#ee5c53"],
+  ];
+
   return new ImageResponse(
     (
       <div
@@ -16,75 +28,66 @@ export default function OgImage() {
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          background: "#0a0a0c",
-          backgroundImage:
-            "radial-gradient(1200px 500px at 50% -20%, rgba(230,178,60,0.18), transparent)",
+          background: paper,
+          backgroundImage: `radial-gradient(1200px 520px at 50% -25%, rgba(234,165,58,0.28), transparent)`,
           padding: "72px",
-          color: "#f4f1ea",
+          color: cream,
           fontFamily: "sans-serif",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
           <div
             style={{
-              width: 46,
-              height: 46,
+              width: 48,
+              height: 48,
               borderRadius: 999,
-              border: "2px solid #e6b23c",
+              border: `2.5px solid ${gold}`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: "#e6b23c",
+              color: gold,
               fontSize: 26,
-              fontWeight: 700,
+              fontWeight: 800,
             }}
           >
             V
           </div>
-          <div style={{ fontSize: 30, fontWeight: 700 }}>Vouch</div>
-          <div
-            style={{
-              marginLeft: 8,
-              fontSize: 18,
-              color: "#e6b23c",
-              letterSpacing: 3,
-              textTransform: "uppercase",
-            }}
-          >
+          <div style={{ fontSize: 32, fontWeight: 800 }}>Vouch</div>
+          <div style={{ marginLeft: 8, fontSize: 18, color: gold, letterSpacing: 3, textTransform: "uppercase" }}>
             Ratings Authority
           </div>
         </div>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ fontSize: 68, fontWeight: 800, lineHeight: 1.05, letterSpacing: -2 }}>
-            We hire every agent on OKX.AI
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ fontSize: 74, fontWeight: 800, lineHeight: 1.02, letterSpacing: -2 }}>
+            The credit rating for
           </div>
-          <div style={{ fontSize: 68, fontWeight: 400, fontStyle: "italic", color: "#e6b23c", lineHeight: 1.05 }}>
-            so you don&rsquo;t have to.
+          <div style={{ fontSize: 74, fontWeight: 800, lineHeight: 1.02, letterSpacing: -2, color: gold }}>
+            the agent economy.
           </div>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 18, fontSize: 24, color: "#a1a0aa" }}>
-          {["S", "A", "B", "C", "F"].map((g, i) => (
+        <div style={{ display: "flex", alignItems: "center", gap: 14, fontSize: 22, color: "#a9b6d4" }}>
+          {grades.map(([g, c]) => (
             <div
               key={g}
               style={{
                 display: "flex",
                 width: 52,
                 height: 52,
-                borderRadius: 10,
+                borderRadius: 12,
                 alignItems: "center",
                 justifyContent: "center",
-                fontWeight: 700,
-                color: ["#43d6a0", "#43d6a0", "#5bc8d8", "#e6b23c", "#e5484d"][i],
-                border: `1px solid ${["#43d6a0", "#43d6a0", "#5bc8d8", "#e6b23c", "#e5484d"][i]}55`,
-                background: `${["#43d6a0", "#43d6a0", "#5bc8d8", "#e6b23c", "#e5484d"][i]}22`,
+                fontWeight: 800,
+                color: c,
+                border: `1.5px solid ${c}66`,
+                background: `${c}22`,
               }}
             >
               {g}
             </div>
           ))}
-          <div style={{ marginLeft: 12 }}>Evidence-backed, on-chain agent ratings · x402</div>
+          <div style={{ marginLeft: 14 }}>277 agents graded from real on-chain signals · x402</div>
         </div>
       </div>
     ),

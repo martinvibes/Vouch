@@ -1,18 +1,19 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import type { Metadata } from "next";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { Seal } from "@/components/Seal";
+import { AgentAvatar } from "@/components/AgentAvatar";
 import { GradeBadge } from "@/components/GradeBadge";
-import { getAgent, getRatings } from "@/lib/data";
-import { RUBRICS, CATEGORY_LABELS } from "@/lib/rubrics";
-import { toGrade, gradeColor, GRADE_MEANING } from "@/lib/grade";
-import { fmtUsd, fmtLatency, fmtRelative, shortHash, flagLabel } from "@/lib/format";
+import { CopyButton } from "@/components/CopyButton";
+import { getAgent, getRatings, getByCategory } from "@/lib/data";
+import { RUBRIC } from "@/lib/rubrics";
+import { GRADE_MEANING, gradeColor } from "@/lib/grade";
+import type { Evidence } from "@/lib/types";
 
-export async function generateStaticParams() {
-  const ratings = await getRatings();
-  return ratings.map((r) => ({ handle: r.handle }));
+export function generateStaticParams() {
+  return getRatings().map((r) => ({ handle: r.handle }));
 }
 
 export async function generateMetadata({
@@ -21,220 +22,218 @@ export async function generateMetadata({
   params: Promise<{ handle: string }>;
 }): Promise<Metadata> {
   const { handle } = await params;
-  const agent = await getAgent(handle);
-  if (!agent) return { title: "Agent not found · Vouch" };
+  const a = getAgent(handle);
+  if (!a) return { title: "Not found — Vouch" };
   return {
-    title: `${agent.name} — Grade ${agent.grade} · Vouch`,
-    description: `${agent.name} scored ${agent.score}/100 (grade ${agent.grade}) across ${agent.tasksRun} mystery-shopped tasks on OKX.AI. See the full evidence-backed scorecard.`,
+    title: `${a.name} — Grade ${a.grade} · Vouch`,
+    description: `Vouch grades ${a.name} a ${a.grade} (${a.score}/100). ${GRADE_MEANING[a.grade]} Evidence-backed rating from real OKX.AI marketplace signals.`,
   };
 }
 
-export default async function AgentScorecard({
-  params,
-}: {
-  params: Promise<{ handle: string }>;
-}) {
+const RUBRIC_BY_KEY = Object.fromEntries(RUBRIC.criteria.map((c) => [c.key, c]));
+
+function recommendation(score: number, proven: boolean): { verb: string; color: string; note: string } {
+  if (score >= 80 && proven) return { verb: "Hire", color: "var(--grade-a)", note: "Certified — safe to hire for its stated services." };
+  if (score >= 66) return { verb: "Hire with checks", color: "var(--grade-b)", note: "Competent, but verify fit for high-stakes work." };
+  if (score >= 52) return { verb: "Verify first", color: "var(--grade-c)", note: "Mixed signals — trial it on low-stakes work before you rely on it." };
+  return { verb: "Avoid", color: "var(--grade-f)", note: "Thin or poor signals for the price. Look elsewhere." };
+}
+
+function evidenceColor(kind: Evidence["kind"]): string {
+  return kind === "positive"
+    ? "var(--grade-a)"
+    : kind === "negative"
+      ? "var(--grade-f)"
+      : kind === "onchain"
+        ? "var(--gold-3)"
+        : "var(--ink-soft)";
+}
+
+export default async function AgentPage({ params }: { params: Promise<{ handle: string }> }) {
   const { handle } = await params;
-  const agent = await getAgent(handle);
-  if (!agent) notFound();
+  const a = getAgent(handle);
+  if (!a) notFound();
 
-  const rubric = RUBRICS[agent.category];
-  const scoreByKey = new Map(agent.criteria.map((c) => [c.key, c.score]));
-
-  const facts = [
-    { label: "Rank", value: `#${agent.rank}` },
-    { label: "Reliability", value: `${agent.reliability}%` },
-    { label: "Tasks shopped", value: agent.tasksRun.toString() },
-    { label: "We paid it", value: fmtUsd(agent.spendUsd) },
-  ];
+  const rec = recommendation(a.score, a.proven);
+  const total = getRatings().length;
+  const related = getByCategory(a.category)
+    .filter((r) => r.id !== a.id)
+    .slice(0, 4);
+  const confidenceLabel = { high: "High confidence", medium: "Medium confidence", low: "Low confidence" }[a.confidence];
 
   return (
     <>
       <Nav />
 
       <main className="wrap pt-10">
-        <Link href="/#leaderboard" className="font-mono text-xs text-[var(--color-fg-mute)] hover:text-[var(--color-gold)]">
-          ← Back to the board
-        </Link>
+        <Link href="/#board" className="font-mono text-xs text-ink-mute hover:text-gold-3">← Back to the board</Link>
 
-        {/* ---- Header ------------------------------------------------------ */}
-        <section className="mt-6 grid items-center gap-8 md:grid-cols-[300px_1fr]">
-          <div className="flex justify-center">
-            <Seal
-              grade={agent.grade}
-              score={agent.score}
-              size={280}
-              subtitle={CATEGORY_LABELS[agent.category]}
-              animate
-            />
+        {/* ---- Scorecard header ---- */}
+        <section className="mt-5 grid gap-8 md:grid-cols-[1fr_auto] md:items-start">
+          <div className="animate-rise">
+            <div className="flex items-center gap-4">
+              <AgentAvatar name={a.name} url={a.avatarUrl} size={64} />
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="font-display text-3xl font-extrabold tracking-tight sm:text-4xl">{a.name}</h1>
+                  {a.certified && <span className="text-gold" title="Vouch Certified">✶</span>}
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-ink-mute">
+                  <span className="pill">{a.categoryLabel}</span>
+                  <span className="font-mono">{a.serviceType}</span>
+                  {a.signals.online ? (
+                    <span className="pill pill-live"><span className="dot" /> Online</span>
+                  ) : (
+                    <span className="pill">Offline</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <p className="mt-5 max-w-2xl text-lg leading-relaxed text-ink-soft">{a.blurb}</p>
+
+            {/* Verdict */}
+            <div className="card-stamp mt-6 flex flex-wrap items-center gap-x-8 gap-y-3 p-5">
+              <div>
+                <div className="font-mono text-[0.68rem] uppercase tracking-wide text-ink-mute">Rank</div>
+                <div className="font-display text-xl font-bold">#{a.rank}<span className="text-ink-mute"> / {total}</span></div>
+              </div>
+              <div>
+                <div className="font-mono text-[0.68rem] uppercase tracking-wide text-ink-mute">Verdict</div>
+                <div className="font-display text-xl font-bold" style={{ color: rec.color }}>{rec.verb}</div>
+              </div>
+              <div>
+                <div className="font-mono text-[0.68rem] uppercase tracking-wide text-ink-mute">Confidence</div>
+                <div className="font-display text-xl font-bold">{confidenceLabel}</div>
+              </div>
+              <p className="max-w-xs text-sm text-ink-soft">{rec.note}</p>
+            </div>
           </div>
 
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="pill">{CATEGORY_LABELS[agent.category]}</span>
-              <span className="pill font-mono">{agent.serviceType}</span>
-              {agent.certified ? (
-                <span className="pill" style={{ color: "var(--color-gold)", borderColor: "var(--color-gold-deep)" }}>
-                  ✶ Vouch Certified
-                </span>
-              ) : (
-                <span className="pill">Not certified</span>
-              )}
-            </div>
-
-            <h1 className="mt-4 text-4xl font-semibold tracking-tight sm:text-5xl">{agent.name}</h1>
-            <div className="mt-1 font-mono text-sm text-[var(--color-fg-mute)]">
-              @{agent.handle} · {agent.priceModel} · id {shortHash(agent.id)}
-            </div>
-
-            <p className="serif mt-4 max-w-xl text-xl leading-snug text-[var(--color-fg-dim)]">
-              {GRADE_MEANING[agent.grade]}
-            </p>
-            <p className="mt-3 max-w-xl text-[var(--color-fg-dim)]">{agent.blurb}</p>
-
-            <div className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-[var(--color-line)] sm:grid-cols-4">
-              {facts.map((f) => (
-                <div key={f.label} className="bg-[var(--color-ink-2)] px-4 py-4">
-                  <div className="font-mono text-xl font-semibold tabular-nums">{f.value}</div>
-                  <div className="mt-0.5 text-[0.7rem] uppercase tracking-wide text-[var(--color-fg-mute)]">
-                    {f.label}
-                  </div>
-                </div>
-              ))}
-            </div>
+          {/* Seal */}
+          <div className="flex flex-col items-center gap-2 justify-self-center md:justify-self-end">
+            <Seal grade={a.grade} score={a.score} size={230} animate />
+            <div className="max-w-[230px] text-center font-mono text-xs text-ink-mute">{GRADE_MEANING[a.grade]}</div>
           </div>
         </section>
 
-        {/* ---- Score breakdown -------------------------------------------- */}
-        <section className="mt-16 grid gap-8 md:grid-cols-[1fr_320px]">
-          <div>
-            <div className="eyebrow mb-2">The breakdown</div>
-            <h2 className="mb-1 text-2xl font-semibold">How the {agent.grade} was earned</h2>
-            <p className="mb-6 text-sm text-[var(--color-fg-dim)]">
-              {rubric.summary} Weights are published and identical for every {CATEGORY_LABELS[agent.category].toLowerCase()} agent.
-            </p>
-
-            <div className="panel-flat divide-y divide-[var(--color-line)]">
-              {rubric.criteria.map((c) => {
-                const s = scoreByKey.get(c.key) ?? 0;
-                const g = toGrade(s);
+        {/* ---- Score breakdown + evidence ---- */}
+        <section className="mt-14 grid gap-10 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="reveal">
+            <h2 className="mb-5 font-display text-2xl font-extrabold">Score breakdown</h2>
+            <div className="panel divide-y divide-line">
+              {a.criteria.map((c) => {
+                const meta = RUBRIC_BY_KEY[c.key];
                 return (
                   <div key={c.key} className="p-5">
-                    <div className="flex items-baseline justify-between gap-4">
-                      <div className="flex items-center gap-2.5">
-                        <span className="font-semibold">{c.label}</span>
-                        <span className="font-mono text-xs text-[var(--color-fg-mute)]">
-                          {Math.round(c.weight * 100)}% weight
-                        </span>
-                      </div>
-                      <span className="font-mono text-sm tabular-nums" style={{ color: gradeColor(g) }}>
-                        {s}/100
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="font-medium">{meta?.label ?? c.key}</span>
+                      <span className="font-mono text-sm">
+                        <span className="tabular-nums">{c.score}</span>
+                        <span className="text-ink-mute">/100 · {Math.round((meta?.weight ?? 0) * 100)}% weight</span>
                       </span>
                     </div>
-                    <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[var(--color-line)]">
-                      <div className="h-full rounded-full" style={{ width: `${s}%`, background: gradeColor(g) }} />
+                    <div className="meter mt-2" style={{ ["--g" as string]: gradeColor(a.grade) }}>
+                      <i style={{ width: `${c.score}%` }} />
                     </div>
-                    <p className="mt-2.5 text-sm text-[var(--color-fg-mute)]">{c.description}</p>
+                    {meta && <p className="mt-2 text-sm text-ink-soft">{meta.description}</p>}
                   </div>
                 );
               })}
             </div>
           </div>
 
-          {/* Aside: certification CTA */}
-          <aside className="md:pt-16">
-            <div className="panel card-cta p-6">
-              <div className="eyebrow mb-3">Are you {agent.name}?</div>
-              {agent.certified ? (
-                <>
-                  <h3 className="text-xl font-semibold">You&rsquo;re certified.</h3>
-                  <p className="mt-2 text-sm text-[var(--color-fg-dim)]">
-                    Show the Vouch seal on your listing. Order a deep audit any time to defend or
-                    raise your grade.
-                  </p>
-                </>
-              ) : (
-                <>
-                  <h3 className="text-xl font-semibold">Raise your grade.</h3>
-                  <p className="mt-2 text-sm text-[var(--color-fg-dim)]">
-                    A deep audit shows exactly where you lose points, with fixes. Ship them, then
-                    order a re-grade — pass A and you&rsquo;re certified.
-                  </p>
-                </>
-              )}
-              <Link href="/certify" className="btn btn-primary mt-5 w-full">
-                {agent.certified ? "Order a deep audit" : "Get certified"}
-              </Link>
+          <div className="reveal">
+            <h2 className="mb-5 font-display text-2xl font-extrabold">The evidence</h2>
+            <div className="space-y-3">
+              {a.evidence.map((e, i) => (
+                <div key={i} className="receipt flex items-center justify-between gap-4 p-4">
+                  <div>
+                    <div className="text-[0.68rem] uppercase tracking-wide text-ink-mute">{e.label}</div>
+                    {e.detail && <div className="mt-0.5 text-xs text-ink-soft">{e.detail}</div>}
+                  </div>
+                  <div className="shrink-0 text-right font-mono font-semibold" style={{ color: evidenceColor(e.kind) }}>
+                    {e.value}
+                  </div>
+                </div>
+              ))}
             </div>
-          </aside>
+            {!a.proven && (
+              <p className="mt-4 text-sm text-ink-mute">
+                This agent has no settled jobs on record, so it&rsquo;s graded provisionally and capped at
+                a B until buyers have actually hired it.
+              </p>
+            )}
+          </div>
         </section>
 
-        {/* ---- Evidence: task history ------------------------------------- */}
-        <section className="mt-16">
-          <div className="eyebrow mb-2">The evidence</div>
-          <h2 className="mb-1 text-2xl font-semibold">Every task we ran, on the record</h2>
-          <p className="mb-6 max-w-2xl text-sm text-[var(--color-fg-dim)]">
-            Vouch paid for each of these anonymously. The settlement hash points at the escrow or
-            x402 payment on X Layer — the proof this grade was earned, not asserted.
+        {/* ---- Services ---- */}
+        {a.services.length > 0 && (
+          <section className="mt-14 reveal">
+            <h2 className="mb-5 font-display text-2xl font-extrabold">Listed services</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {a.services.map((s, i) => (
+                <div key={i} className="panel p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <h3 className="font-semibold">{s.name}</h3>
+                    <span className="pill shrink-0">{s.type}</span>
+                  </div>
+                  {s.description && <p className="mt-2 text-sm text-ink-soft">{s.description}</p>}
+                  <div className="mt-3 flex items-center gap-3 font-mono text-xs text-ink-mute">
+                    <span className="text-gold-3">{s.feeUsd != null ? `$${s.feeUsd} / call` : "negotiated"}</span>
+                    {s.endpoint && <span className="truncate">· {s.endpoint}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ---- On-chain identity ---- */}
+        <section className="mt-14 reveal">
+          <h2 className="mb-5 font-display text-2xl font-extrabold">On-chain identity</h2>
+          <div className="card-stamp grid gap-5 p-6 sm:grid-cols-3">
+            <div>
+              <div className="font-mono text-[0.68rem] uppercase tracking-wide text-ink-mute">ERC-8004 agent</div>
+              <div className="mt-1 font-mono text-lg font-semibold hash">#{a.id}</div>
+            </div>
+            <div className="sm:col-span-2">
+              <div className="font-mono text-[0.68rem] uppercase tracking-wide text-ink-mute">Communication address · X Layer</div>
+              {a.communicationAddress ? (
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <span className="break-all font-mono text-sm">{a.communicationAddress}</span>
+                  <CopyButton value={a.communicationAddress} label="address" />
+                </div>
+              ) : (
+                <div className="mt-1 font-mono text-sm text-ink-mute">Not published</div>
+              )}
+            </div>
+          </div>
+          <p className="mt-3 font-mono text-xs text-ink-mute">
+            Graded from the OKX.AI marketplace snapshot of{" "}
+            {new Date(a.snapshotAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}.
+            This rating is independent and not investment advice.
           </p>
-
-          <ul className="space-y-3">
-            {agent.tasks.map((t) => {
-              const g = toGrade(t.overall);
-              return (
-                <li key={t.id} className="panel-flat p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-3">
-                        <GradeBadge grade={g} size="sm" />
-                        <span className="font-mono text-xs text-[var(--color-fg-mute)]">
-                          {fmtRelative(t.submittedAt)} · {fmtLatency(t.latencyMs)} · {fmtUsd(t.costUsd)}
-                        </span>
-                      </div>
-                      <p className="mt-3 text-[var(--color-fg)]">
-                        <span className="text-[var(--color-fg-mute)]">Requested:</span> {t.prompt}
-                      </p>
-                      <p className="mt-1.5 text-sm text-[var(--color-fg-dim)]">
-                        <span className="text-[var(--color-fg-mute)]">Verdict:</span> {t.verdict}
-                      </p>
-
-                      {t.flags.length > 0 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {t.flags.map((f) => (
-                            <span
-                              key={f}
-                              className="rounded-md border px-2 py-1 font-mono text-[0.7rem]"
-                              style={{ borderColor: "color-mix(in srgb, var(--color-grade-f) 40%, transparent)", color: "var(--color-grade-f)" }}
-                            >
-                              ⚑ {flagLabel(f)}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="font-mono text-2xl tabular-nums" style={{ color: gradeColor(g) }}>
-                      {t.overall}
-                    </div>
-                  </div>
-
-                  <div className="receipt mt-4 flex items-center justify-between gap-3 px-3 py-2">
-                    <span className="text-[var(--color-fg-mute)]">X Layer settlement</span>
-                    <a
-                      href={`https://web3.okx.com/explorer/xlayer/tx/${t.txHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hash truncate hover:underline"
-                      title={t.txHash}
-                    >
-                      {shortHash(t.txHash)} ↗
-                    </a>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
         </section>
+
+        {/* ---- Related ---- */}
+        {related.length > 0 && (
+          <section className="mt-14 reveal">
+            <h2 className="mb-5 font-display text-2xl font-extrabold">More {a.categoryLabel} agents</h2>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {related.map((r) => (
+                <Link key={r.id} href={`/agents/${r.handle}`} className="card-stamp flex items-center gap-3 p-4">
+                  <AgentAvatar name={r.name} url={r.avatarUrl} size={40} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate font-semibold">{r.name}</div>
+                    <div className="font-mono text-xs text-ink-mute">#{r.rank} · {r.score}/100</div>
+                  </div>
+                  <GradeBadge grade={r.grade} size="sm" />
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
       </main>
 
       <Footer />

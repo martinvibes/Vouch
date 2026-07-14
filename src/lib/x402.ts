@@ -17,9 +17,15 @@ export const X402_VERSION = 1;
 export const RATING_PRICE_ATOMIC = "20000";
 export const RATING_PRICE_USD = 0.02;
 
-/** Vouch's receiving identity and the settlement asset on X Layer. */
-const PAY_TO = "0xVOUCH000000000000000000000000000000abcd";
-const USDC_XLAYER = "0x74b7f16337b8972027f6196a17a631ac6de26d22";
+/**
+ * Vouch's receiving identity and the settlement asset on X Layer.
+ * PAY_TO is Vouch's real Agentic Wallet address (ERC-8004 ASP #5434), so a
+ * settled call pays the actual authority — no placeholder.
+ */
+export const PAY_TO = "0x6f1b837d7c27f62e4b1bc72a41d02118e30e9af1";
+export const USDC_XLAYER = "0x74b7f16337b8972027f6196a17a631ac6de26d22";
+export const NETWORK = "x-layer";
+export const ASP_ID = "5434";
 
 export interface PaymentRequirements {
   scheme: "exact";

@@ -1,35 +1,38 @@
 /**
- * Vouch domain model.
+ * Vouch domain model — REAL edition.
  *
- * The whole product is one loop: hire an agent → collect its deliverable →
- * score it against a published rubric → record the evidence on-chain → publish
- * a grade. These types describe the output of that loop.
+ * Vouch rates real agents listed on the OKX.AI marketplace. Every grade is
+ * computed from published, verifiable signals: buyer feedback on settled
+ * escrow jobs, OKX security scans, the agent's live service listings and
+ * pricing, availability, and its on-chain identity on X Layer. Nothing here is
+ * invented — an agent with no track record is graded provisionally and flagged.
  */
 
-export type GradeLetter = "S" | "A+" | "A" | "B" | "C" | "D" | "F";
+export type GradeLetter = "S" | "A" | "B" | "C" | "D" | "F";
 
+/** Real OKX.AI marketplace categories. */
 export type Category =
-  | "market-data"
-  | "trading"
-  | "research"
-  | "security"
+  | "finance"
+  | "software"
+  | "art"
+  | "lifestyle"
   | "prediction"
-  | "creative"
-  | "dev"
-  | "lifestyle";
+  | "other";
 
 export type ServiceType = "A2A" | "A2MCP";
 
-/** One weighted line item in a category's scoring rubric. */
+export type Confidence = "high" | "medium" | "low";
+
+/** One weighted line item in the published rubric. */
 export interface RubricCriterion {
   key: string;
   label: string;
-  weight: number; // 0..1; weights within a rubric sum to 1
+  weight: number; // 0..1; weights sum to 1
   description: string;
+  source: string; // the real signal this is measured from
 }
 
 export interface Rubric {
-  category: Category;
   title: string;
   summary: string;
   criteria: RubricCriterion[];
@@ -40,50 +43,71 @@ export interface CriterionScore {
   score: number; // 0..100
 }
 
-/**
- * A single mystery-shop: Vouch anonymously hired the agent for one real task
- * and scored what came back. Every field here is meant to be verifiable — the
- * settlement hash points at the escrow/x402 payment on X Layer.
- */
-export interface TestTask {
-  id: string;
-  prompt: string; // exactly what Vouch requested
-  submittedAt: string; // ISO
-  costUsd: number; // what Vouch paid for this task
-  latencyMs: number;
-  txHash: string; // settlement on X Layer
-  scores: CriterionScore[];
-  overall: number; // 0..100
-  verdict: string; // one-line note in the guide's voice
-  flags: string[]; // machine-detected concerns, e.g. "spec-miss", "overpriced"
+/** A single, real, verifiable piece of evidence behind a grade. */
+export interface Evidence {
+  label: string;
+  value: string;
+  detail?: string;
+  kind: "positive" | "neutral" | "negative" | "onchain";
+}
+
+/** A real service the agent lists on the marketplace. */
+export interface RatedService {
+  name: string;
+  description: string;
+  type: ServiceType;
+  feeUsd: number | null;
+  endpoint: string | null;
+}
+
+/** The raw real signals pulled from the marketplace for one agent. */
+export interface AgentSignals {
+  feedbackRate: number | null; // 0..100, buyer satisfaction on settled jobs
+  securityRate: number | null; // 0..5, OKX security scan
+  online: boolean;
+  serviceCount: number;
+  minPriceUsd: number | null;
+  hasAvatar: boolean;
+  descLen: number;
+  soldCount: number | null;
+  communicationAddress: string;
 }
 
 export interface AgentRating {
-  id: string; // ERC-8004 on-chain agent id
+  id: string; // ERC-8004 on-chain agent id (the marketplace #)
   name: string;
-  handle: string; // marketplace handle, no leading @
+  handle: string; // URL slug
   category: Category;
+  categoryLabel: string;
   serviceType: ServiceType;
   blurb: string;
-  priceModel: string; // human-readable, e.g. "$0.02 / call" or "escrow · negotiated"
+  avatarUrl: string | null;
+  okxUrl: string; // deep link to the agent on okx.ai
+  communicationAddress: string;
+  priceModel: string; // human-readable
+
   score: number; // 0..100 aggregate
   grade: GradeLetter;
-  rank: number; // 1-indexed, overall
-  tasksRun: number;
-  spendUsd: number; // total Vouch has paid this agent (marketplace GDP we generated)
-  reliability: number; // 0..100, share of tasks that met spec
-  lastAuditedAt: string; // ISO
-  criteria: CriterionScore[]; // aggregate, per rubric criterion
-  tasks: TestTask[]; // recent mystery-shops
-  certified: boolean; // score >= certification threshold
-  trend: number; // point change vs previous cycle (+/-)
+  rank: number; // 1-indexed overall
+  confidence: Confidence;
+  proven: boolean; // has real buyer feedback on settled jobs
+  reliability: number; // 0..100 (feedbackRate, or 0 if unproven)
+  certified: boolean; // proven AND score >= threshold
+
+  criteria: CriterionScore[]; // per rubric criterion
+  evidence: Evidence[]; // the real receipts
+  services: RatedService[];
+  signals: AgentSignals;
+  snapshotAt: string; // ISO — when the marketplace was sampled
 }
 
-/** Public marketplace-wide totals shown on the leaderboard header. */
+/** Marketplace-wide totals shown on the leaderboard header. */
 export interface MarketStats {
   agentsRated: number;
-  tasksRun: number;
-  spendUsd: number; // total we've paid into the marketplace
+  provenCount: number; // agents with real buyer feedback
   certifiedCount: number;
-  lastCycleAt: string;
+  online: number;
+  categories: number;
+  medianScore: number;
+  snapshotAt: string;
 }

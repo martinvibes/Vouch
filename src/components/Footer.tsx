@@ -1,52 +1,51 @@
 import Link from "next/link";
 
+/** Vouch's real on-chain identity — shown, not claimed. */
+const ASP_ID = "5434";
+const ASP_ADDR = "0x6f1b837d7c27f62e4b1bc72a41d02118e30e9af1";
+
 export function Footer() {
   return (
-    <footer className="mt-28 border-t border-[var(--color-line)]">
-      <div className="wrap grid gap-8 py-14 sm:grid-cols-[1.4fr_1fr_1fr]">
+    <footer className="mt-28 border-t border-line">
+      <div className="wrap grid gap-10 py-14 sm:grid-cols-[1.5fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">
-            <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden>
-              <circle cx="12" cy="12" r="10.5" fill="none" stroke="var(--color-gold)" strokeWidth="1.4" />
-              <text x="12" y="16" textAnchor="middle" fill="var(--color-gold)" style={{ fontFamily: "var(--font-mono)", fontSize: "11px", fontWeight: 700 }}>V</text>
-            </svg>
-            <span className="text-lg font-semibold">Vouch</span>
+            <span className="font-display text-lg font-extrabold">Vouch</span>
           </div>
-          <p className="serif mt-3 max-w-xs text-lg leading-snug text-[var(--color-fg-dim)]">
+          <p className="mt-3 max-w-xs font-display text-lg font-semibold leading-snug tracking-tight">
             The ratings authority for the agent economy.
           </p>
-          <p className="mt-4 max-w-sm text-sm text-[var(--color-fg-mute)]">
-            Independent, evidence-backed grades for agents on OKX.AI. Every rating is earned by
-            real, paid, on-chain work.
+          <p className="mt-4 max-w-sm text-sm text-ink-soft">
+            Independent, evidence-backed grades for every agent on OKX.AI — computed only from
+            real, published marketplace signals. No agent can buy its grade.
           </p>
         </div>
 
         <div>
           <div className="eyebrow mb-4">Explore</div>
-          <ul className="space-y-2.5 text-sm text-[var(--color-fg-dim)]">
-            <li><Link href="/#leaderboard" className="hover:text-[var(--color-fg)]">Leaderboard</Link></li>
-            <li><Link href="/methodology" className="hover:text-[var(--color-fg)]">Methodology</Link></li>
-            <li><Link href="/api-docs" className="hover:text-[var(--color-fg)]">Rating API</Link></li>
-            <li><Link href="/certify" className="hover:text-[var(--color-fg)]">Get certified</Link></li>
+          <ul className="space-y-2.5 text-sm text-ink-soft">
+            <li><Link href="/#board" className="hover:text-ink">Leaderboard</Link></li>
+            <li><Link href="/methodology" className="hover:text-ink">Methodology</Link></li>
+            <li><Link href="/guard" className="hover:text-ink">Vouch Guard</Link></li>
+            <li><Link href="/api-docs" className="hover:text-ink">Rating API</Link></li>
+            <li><Link href="/certify" className="hover:text-ink">Get certified</Link></li>
           </ul>
         </div>
 
         <div>
-          <div className="eyebrow mb-4">Built on</div>
-          <ul className="space-y-2.5 text-sm text-[var(--color-fg-dim)]">
-            <li>OKX.AI Marketplace</li>
+          <div className="eyebrow mb-4">On-chain identity</div>
+          <ul className="space-y-2.5 text-sm text-ink-soft">
+            <li>ERC-8004 ASP · <span className="hash font-mono">#{ASP_ID}</span></li>
+            <li className="font-mono text-xs text-ink-mute">{ASP_ADDR.slice(0, 10)}…{ASP_ADDR.slice(-8)}</li>
             <li>X Layer · escrow + x402</li>
-            <li>ERC-8004 agent identity</li>
           </ul>
-          <p className="mt-5 text-xs text-[var(--color-fg-mute)]">
-            OKX.AI Genesis Hackathon · 2026
-          </p>
+          <p className="mt-5 text-xs text-ink-mute">OKX.AI Genesis Hackathon · 2026</p>
         </div>
       </div>
-      <div className="border-t border-[var(--color-line)]">
-        <div className="wrap flex flex-col gap-2 py-5 text-xs text-[var(--color-fg-mute)] sm:flex-row sm:items-center sm:justify-between">
+      <div className="border-t border-line">
+        <div className="wrap flex flex-col gap-2 py-5 text-xs text-ink-mute sm:flex-row sm:items-center sm:justify-between">
           <span>© 2026 Vouch. An independent Agent Service Provider.</span>
-          <span className="font-mono">A one-agent company · powered by OKX.AI</span>
+          <span className="font-mono">a one-agent company · built on OKX.AI</span>
         </div>
       </div>
     </footer>

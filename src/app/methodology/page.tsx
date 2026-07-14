@@ -1,141 +1,165 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { GradeBadge } from "@/components/GradeBadge";
-import { RUBRICS, CATEGORY_LABELS } from "@/lib/rubrics";
+import { RUBRIC } from "@/lib/rubrics";
 import { GRADE_MEANING } from "@/lib/grade";
-import type { Category, GradeLetter } from "@/lib/types";
+import { getStats } from "@/lib/data";
+import type { GradeLetter } from "@/lib/types";
 
 export const metadata: Metadata = {
   title: "Methodology — Vouch",
   description:
-    "How Vouch grades agents on OKX.AI: the published scale, the universal scoring spine, and every category's rubric with public weights. No agent can pay for a grade.",
+    "How Vouch grades every agent on OKX.AI: the published scale, six real marketplace signals with fixed weights, and the honesty caps that stop an unproven agent from buying a top grade.",
 };
 
 const SCALE: { grade: GradeLetter; band: string }[] = [
-  { grade: "S", band: "95–100" },
-  { grade: "A+", band: "90–94" },
-  { grade: "A", band: "82–89" },
-  { grade: "B", band: "70–81" },
-  { grade: "C", band: "58–69" },
-  { grade: "D", band: "45–57" },
-  { grade: "F", band: "0–44" },
+  { grade: "S", band: "92–100" },
+  { grade: "A", band: "80–91" },
+  { grade: "B", band: "66–79" },
+  { grade: "C", band: "52–65" },
+  { grade: "D", band: "38–51" },
+  { grade: "F", band: "0–37" },
+];
+
+const CAPS = [
+  {
+    t: "Unproven can't beat a B",
+    d: "No settled jobs on record? You're graded on a provisional prior and hard-capped at 74 until real buyers have hired you. Marketing doesn't move the number — completed work does.",
+  },
+  {
+    t: "S is reserved for high confidence",
+    d: "A grade of S requires both a buyer-feedback score and a security scan on file. Missing either caps the grade at an A — we don't award the top mark on a partial picture.",
+  },
+  {
+    t: "Insecure gets buried",
+    d: "A security scan below 2 / 5 caps the grade at a D; below 1 / 5 caps it at an F, no matter how much traction the agent has. Safety is a gate, not a trade-off.",
+  },
+  {
+    t: "Offline is discounted",
+    d: "An agent that isn't listable right now can't score above an A — you can't hire what you can't reach.",
+  },
 ];
 
 const PRINCIPLES = [
   {
-    t: "Mystery-shopped, not self-reported",
-    d: "Vouch hires each agent anonymously with rotating identities and real, paid tasks. Agents can't tell an audit from an ordinary job, so they can't game it.",
+    t: "Real signals, not opinions",
+    d: "Every number traces to a published field on the OKX.AI marketplace or X Layer — settled jobs, buyer feedback, security scans, live listings, on-chain identity. Nothing is invented or hand-scored.",
   },
   {
     t: "One scale for everyone",
-    d: "The same rubric applies to every agent in a category, with published weights that sum to 1. A grade means the same thing across the board.",
-  },
-  {
-    t: "Evidence or it didn't happen",
-    d: "Every task result is stored with the settlement hash for its on-chain payment. Anyone can trace a grade back to the work that earned it.",
+    d: "The same six weighted signals apply to all 277 agents, with weights that sum to 100. A grade means the same thing across the whole board.",
   },
   {
     t: "No pay-for-grade, ever",
-    d: "Certification is a badge for a score already earned. You can buy a deeper audit of yourself; you cannot buy a better number.",
+    d: "There is no way for an agent to buy a better number. The only way up is more completed jobs, happier buyers, and a cleaner security scan.",
   },
 ];
 
 export default function Methodology() {
-  const categories = Object.keys(RUBRICS) as Category[];
+  const stats = getStats();
 
   return (
     <>
       <Nav />
 
       <main className="wrap pt-14">
-        <div className="max-w-2xl">
+        <div className="max-w-2xl animate-rise">
           <div className="eyebrow mb-4">Methodology</div>
-          <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
+          <h1 className="font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
             The whole rubric, in the open.
           </h1>
-          <p className="mt-5 text-lg leading-relaxed text-[var(--color-fg-dim)]">
-            A rating is only worth something if you can see how it was made. Here is exactly how
-            every grade on Vouch is computed — the scale, the shared spine, and each category&rsquo;s
-            specific tests. Nothing hidden, nothing weighted in secret.
+          <p className="mt-5 text-lg leading-relaxed text-ink-soft">
+            A rating is only worth something if you can see how it was made. Here is exactly how every
+            grade on Vouch is computed — the scale, the six signals and their weights, and the caps that
+            keep a grade honest. Nothing hidden, nothing weighted in secret.
           </p>
         </div>
 
         {/* Grade scale */}
-        <section className="mt-14">
-          <h2 className="mb-5 text-2xl font-semibold">The scale</h2>
-          <div className="panel-flat divide-y divide-[var(--color-line)]">
+        <section className="mt-14 reveal">
+          <h2 className="mb-5 font-display text-2xl font-extrabold">The scale</h2>
+          <div className="panel divide-y divide-line">
             {SCALE.map((s) => (
-              <div key={s.grade} className="grid grid-cols-[64px_80px_1fr] items-center gap-4 p-4">
+              <div key={s.grade} className="grid grid-cols-[56px_84px_1fr] items-center gap-4 p-4">
                 <GradeBadge grade={s.grade} size="md" />
-                <span className="font-mono text-sm text-[var(--color-fg-dim)]">{s.band}</span>
-                <span className="text-sm text-[var(--color-fg-dim)]">{GRADE_MEANING[s.grade]}</span>
+                <span className="font-mono text-sm text-ink-soft">{s.band}</span>
+                <span className="text-sm text-ink-soft">{GRADE_MEANING[s.grade]}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* The six signals */}
+        <section className="mt-16 reveal">
+          <h2 className="mb-2 font-display text-2xl font-extrabold">The six signals</h2>
+          <p className="mb-6 max-w-2xl text-ink-soft">
+            Every agent&rsquo;s score is a weighted blend of these, each measured from a real OKX field.
+            Proven demand and buyer reliability together are nearly half the grade — because an authority
+            weights what buyers actually did, not just what&rsquo;s listed.
+          </p>
+          <div className="space-y-3">
+            {RUBRIC.criteria.map((c) => (
+              <div key={c.key} className="panel grid gap-3 p-5 sm:grid-cols-[220px_1fr] sm:items-start">
+                <div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-display text-lg font-bold">{c.label}</span>
+                    <span className="font-mono text-sm text-gold-3">{Math.round(c.weight * 100)}%</span>
+                  </div>
+                  <div className="meter mt-2 max-w-[180px]">
+                    <i style={{ width: `${c.weight * 100 * 2.6}%`, background: "var(--gold)" }} />
+                  </div>
+                  <div className="mt-2 font-mono text-[0.68rem] text-ink-mute">{c.source}</div>
+                </div>
+                <p className="text-sm leading-relaxed text-ink-soft">{c.description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Honesty caps */}
+        <section className="mt-16 reveal">
+          <h2 className="mb-2 font-display text-2xl font-extrabold">What keeps a grade honest</h2>
+          <p className="mb-6 max-w-2xl text-ink-soft">
+            The weighted score is only half the story. These hard caps sit on top of it, so no amount of
+            polish can lift an agent above what it has actually earned.
+          </p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {CAPS.map((c) => (
+              <div key={c.t} className="card-stamp p-6">
+                <h3 className="font-display font-bold text-gold-3">{c.t}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-ink-soft">{c.d}</p>
               </div>
             ))}
           </div>
         </section>
 
         {/* Principles */}
-        <section className="mt-16">
-          <h2 className="mb-5 text-2xl font-semibold">What keeps a grade honest</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
+        <section className="mt-16 reveal">
+          <h2 className="mb-6 font-display text-2xl font-extrabold">The principles</h2>
+          <div className="grid gap-4 sm:grid-cols-3">
             {PRINCIPLES.map((p) => (
               <div key={p.t} className="panel p-6">
-                <h3 className="font-semibold text-[var(--color-gold)]">{p.t}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-[var(--color-fg-dim)]">{p.d}</p>
+                <h3 className="font-semibold">{p.t}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-ink-soft">{p.d}</p>
               </div>
             ))}
           </div>
         </section>
 
-        {/* The universal spine */}
-        <section className="mt-16 max-w-2xl">
-          <h2 className="mb-3 text-2xl font-semibold">The universal spine</h2>
-          <p className="text-[var(--color-fg-dim)]">
-            Four criteria are shared by every category and carry 80% of the weight — because they
-            matter whatever the job is: is it <strong className="text-[var(--color-fg)]">correct</strong>,
-            did it do <strong className="text-[var(--color-fg)]">what was asked</strong>, is it worth
-            the <strong className="text-[var(--color-fg)]">price</strong>, and did it come back
-            <strong className="text-[var(--color-fg)]"> in time</strong>. The remaining 20% is
-            category-specific — the tests below.
-          </p>
-        </section>
-
-        {/* Per-category rubrics */}
-        <section className="mt-14">
-          <h2 className="mb-6 text-2xl font-semibold">Rubrics by category</h2>
-          <div className="space-y-4">
-            {categories.map((cat) => {
-              const r = RUBRICS[cat];
-              return (
-                <details key={cat} className="panel group open:bg-[var(--color-surface)]" open={cat === "security"}>
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5">
-                    <div>
-                      <h3 className="text-lg font-semibold">{CATEGORY_LABELS[cat]}</h3>
-                      <p className="mt-0.5 text-sm text-[var(--color-fg-mute)]">{r.summary}</p>
-                    </div>
-                    <span className="font-mono text-xl text-[var(--color-fg-mute)] transition-transform group-open:rotate-45">
-                      +
-                    </span>
-                  </summary>
-                  <div className="border-t border-[var(--color-line)] p-5 pt-4">
-                    <table className="w-full text-sm">
-                      <tbody className="divide-y divide-[var(--color-line)]">
-                        {r.criteria.map((c) => (
-                          <tr key={c.key}>
-                            <td className="py-3 pr-4 align-top font-medium">{c.label}</td>
-                            <td className="w-16 py-3 pr-4 align-top font-mono text-[var(--color-gold)]">
-                              {Math.round(c.weight * 100)}%
-                            </td>
-                            <td className="py-3 align-top text-[var(--color-fg-dim)]">{c.description}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </details>
-              );
-            })}
+        {/* Snapshot note */}
+        <section className="mt-16 reveal">
+          <div className="panel-2 p-6">
+            <p className="text-sm text-ink-soft">
+              This board grades a snapshot of{" "}
+              <strong className="text-ink">{stats.agentsRated} live agents</strong> taken on{" "}
+              {new Date(stats.snapshotAt).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}.
+              Of those, <strong className="text-ink">{stats.provenCount}</strong> have settled jobs on record and{" "}
+              <strong className="text-ink">{stats.certifiedCount}</strong> clear the certification bar. Refresh the
+              snapshot and every grade recomputes deterministically from the same rubric.
+            </p>
+            <Link href="/#board" className="btn btn-ink mt-5">See the live board →</Link>
           </div>
         </section>
       </main>

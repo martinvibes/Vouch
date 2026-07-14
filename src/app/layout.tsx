@@ -1,23 +1,23 @@
 import type { Metadata } from "next";
-import { Space_Grotesk, JetBrains_Mono, Instrument_Serif } from "next/font/google";
+import { Unbounded, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Reveals } from "@/components/Reveals";
 
-const spaceGrotesk = Space_Grotesk({
+const unbounded = Unbounded({
   subsets: ["latin"],
-  variable: "--font-space-grotesk",
+  variable: "--font-unbounded",
   display: "swap",
 });
 
-const jetbrainsMono = JetBrains_Mono({
+const geistSans = Geist({
   subsets: ["latin"],
-  variable: "--font-jetbrains-mono",
+  variable: "--font-geist-sans",
   display: "swap",
 });
 
-const instrumentSerif = Instrument_Serif({
+const geistMono = Geist_Mono({
   subsets: ["latin"],
-  weight: "400",
-  variable: "--font-instrument-serif",
+  variable: "--font-geist-mono",
   display: "swap",
 });
 
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(baseUrl),
   title: "Vouch — The Ratings Authority for the Agent Economy",
   description:
-    "Vouch mystery-shops every agent on OKX.AI, then publishes evidence-backed, on-chain ratings. Know which agents to trust before you hire — for humans and for agents, via a pay-per-call API.",
+    "Vouch mystery-shops every agent on OKX.AI, then publishes evidence-backed, on-chain trust ratings. Know which agents to trust before you hire — for humans and for agents, via a pay-per-call x402 API.",
   keywords: [
     "OKX.AI",
     "agent economy",
@@ -38,29 +38,34 @@ export const metadata: Metadata = {
     "x402",
     "agent reputation",
     "mystery shopper",
+    "X Layer",
   ],
   openGraph: {
     title: "Vouch — The Ratings Authority for the Agent Economy",
     description:
-      "We hire every agent on OKX.AI so you don't have to. Evidence-backed, on-chain ratings.",
+      "We hire every agent on OKX.AI so you don't have to. Evidence-backed, on-chain trust ratings.",
     type: "website",
-  },
-  icons: {
-    icon: [{ url: "/seal.svg", type: "image/svg+xml" }],
   },
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+// Set the theme before first paint to avoid a flash. Honors a saved choice,
+// otherwise follows the system preference.
+const themeScript = `(function(){try{var t=localStorage.getItem('vouch-theme');if(t==='dark'||t==='light'){document.documentElement.setAttribute('data-theme',t);}}catch(e){}})();`;
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html
       lang="en"
-      className={`${spaceGrotesk.variable} ${jetbrainsMono.variable} ${instrumentSerif.variable}`}
+      className={`${unbounded.variable} ${geistSans.variable} ${geistMono.variable}`}
+      suppressHydrationWarning
     >
-      <body>{children}</body>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body>
+        {children}
+        <Reveals />
+      </body>
     </html>
   );
 }

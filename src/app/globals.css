@@ -2,247 +2,329 @@
 
 /* ==========================================================================
    VOUCH — The ratings authority for the agent economy.
-   Design language: dark editorial canvas · gold certification seal ·
-   a semantic letter-grade colour scale that IS the visual vocabulary.
+   Design language "The Trust Stamp": warm paper canvas · deep navy ink ·
+   certification gold · a grass→coral letter-grade scale · Unbounded display ·
+   tactile stamped/letterpress motion. Light + dark.
+   Palette & micro-interactions inspired by Anker Protocol.
    ========================================================================== */
 
-@theme {
-  /* Canvas & surfaces — near-black, faintly warm-neutral (seal-on-paper, inverted) */
-  --color-ink: #0a0a0c;
-  --color-ink-2: #0e0e11;
-  --color-surface: #141419;
-  --color-elevated: #1a1a21;
-  --color-line: rgba(244, 241, 234, 0.09);
-  --color-line-strong: rgba(244, 241, 234, 0.16);
+/* ---------- Runtime theme tokens (semantic; components read THESE) -------- */
+:root {
+  color-scheme: light;
 
-  /* Type colours — warm paper-white on ink */
-  --color-fg: #f4f1ea;
-  --color-fg-dim: #a1a0aa;
-  --color-fg-mute: #66656f;
+  /* Canvas */
+  --bg:          #fffdf5;   /* paper */
+  --bg-2:        #f6eed7;   /* cream */
+  --surface:     #ffffff;
+  --surface-2:   #fbf3df;   /* paper-2 */
+  --elevated:    #ffffff;
 
-  /* Signature — certification gold (authority, the seal) */
-  --color-gold: #e6b23c;
-  --color-gold-bright: #f6ce6b;
-  --color-gold-deep: #a9791e;
+  /* Ink */
+  --ink:         #20304d;   /* navy */
+  --ink-soft:    #5b6885;
+  --ink-mute:    #8a94ab;
 
-  /* Grade scale — the semantic core. Green → cyan → gold → orange → red */
-  --color-grade-a: #43d6a0;
-  --color-grade-b: #5bc8d8;
-  --color-grade-c: #e6b23c;
-  --color-grade-d: #e8894a;
-  --color-grade-f: #e5484d;
+  /* Hairlines & hard (letterpress) borders */
+  --line:        rgba(32, 48, 77, 0.12);
+  --line-strong: rgba(32, 48, 77, 0.22);
+  --hard:        #20304d;         /* offset-shadow colour = printed stamp */
 
-  /* Fonts (bound to next/font CSS variables in layout.tsx) */
-  --font-display: var(--font-instrument-serif), Georgia, "Times New Roman", serif;
-  --font-sans: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SF Mono", Menlo, monospace;
+  /* Accent — certification gold */
+  --gold:        #eaa53a;
+  --gold-2:      #f4c061;
+  --gold-3:      #c8851d;
+  --gold-tint:   #fbe6c4;
+  --on-gold:     #2a1e06;
+
+  /* Letter-grade scale (grass → teal → gold → coral) */
+  --grade-s:     #12855a;
+  --grade-a:     #2f9e63;
+  --grade-b:     #2f86b3;
+  --grade-c:     #c8851d;
+  --grade-d:     #db7540;
+  --grade-f:     #cc3f36;
+
+  /* Shadows */
+  --shadow-soft: 0 1px 2px rgba(32,48,77,.05), 0 14px 34px rgba(32,48,77,.09);
+  --shadow-pop:  0 2px 0 rgba(255,255,255,.7) inset, 0 18px 44px rgba(32,48,77,.13);
+
+  --radius:      18px;
+  --radius-sm:   12px;
+  --radius-lg:   26px;
+  --radius-pill: 999px;
 }
 
-@layer base {
-  * {
-    box-sizing: border-box;
-  }
+:root[data-theme="dark"] {
+  color-scheme: dark;
 
-  html {
-    scroll-behavior: smooth;
+  --bg:          #0e1524;
+  --bg-2:        #121b30;
+  --surface:     #17223b;
+  --surface-2:   #141e35;
+  --elevated:    #1c2a49;
+
+  --ink:         #f3ecd8;
+  --ink-soft:    #a9b6d4;
+  --ink-mute:    #6f7e9d;
+
+  --line:        rgba(243, 236, 216, 0.11);
+  --line-strong: rgba(243, 236, 216, 0.20);
+  --hard:        #05080f;
+
+  --gold:        #f4c061;
+  --gold-2:      #f9d488;
+  --gold-3:      #eaa53a;
+  --gold-tint:   rgba(244, 192, 97, 0.15);
+  --on-gold:     #241a05;
+
+  --grade-s:     #2bb87d;
+  --grade-a:     #47c17e;
+  --grade-b:     #52aada;
+  --grade-c:     #edb54a;
+  --grade-d:     #f0925a;
+  --grade-f:     #ee5c53;
+
+  --shadow-soft: 0 1px 2px rgba(0,0,0,.4), 0 18px 40px rgba(0,0,0,.5);
+  --shadow-pop:  0 1px 0 rgba(255,255,255,.05) inset, 0 22px 50px rgba(0,0,0,.55);
+}
+
+/* System-preference dark (only when user hasn't forced light) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg:#0e1524; --bg-2:#121b30; --surface:#17223b; --surface-2:#141e35; --elevated:#1c2a49;
+    --ink:#f3ecd8; --ink-soft:#a9b6d4; --ink-mute:#6f7e9d;
+    --line:rgba(243,236,216,.11); --line-strong:rgba(243,236,216,.20); --hard:#05080f;
+    --gold:#f4c061; --gold-2:#f9d488; --gold-3:#eaa53a; --gold-tint:rgba(244,192,97,.15); --on-gold:#241a05;
+    --grade-s:#2bb87d; --grade-a:#47c17e; --grade-b:#52aada; --grade-c:#edb54a; --grade-d:#f0925a; --grade-f:#ee5c53;
+    --shadow-soft:0 1px 2px rgba(0,0,0,.4), 0 18px 40px rgba(0,0,0,.5);
+    --shadow-pop:0 1px 0 rgba(255,255,255,.05) inset, 0 22px 50px rgba(0,0,0,.55);
   }
+}
+
+/* ---------- Expose runtime tokens to Tailwind utilities + fonts ---------- */
+@theme inline {
+  --font-display: var(--font-unbounded), "Unbounded", ui-sans-serif, system-ui, sans-serif;
+  --font-sans:    var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono:    var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  --color-bg: var(--bg);
+  --color-bg-2: var(--bg-2);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-elevated: var(--elevated);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-mute: var(--ink-mute);
+  --color-gold: var(--gold);
+  --color-gold-2: var(--gold-2);
+  --color-gold-3: var(--gold-3);
+  --color-grade-s: var(--grade-s);
+  --color-grade-a: var(--grade-a);
+  --color-grade-b: var(--grade-b);
+  --color-grade-c: var(--grade-c);
+  --color-grade-d: var(--grade-d);
+  --color-grade-f: var(--grade-f);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+}
+
+/* ------------------------------- Base ----------------------------------- */
+@layer base {
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; overflow-x: hidden; }
 
   body {
-    background-color: var(--color-ink);
-    color: var(--color-fg);
+    background-color: var(--bg);
+    color: var(--ink);
     font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.55;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
     overflow-x: hidden;
-    /* Ambient: a single restrained gold aura at the crown, over a faint grid */
+    /* Warm ambience — a soft paper wash + one gold aura at the crown. NO grid. */
     background-image:
-      radial-gradient(120% 80% at 50% -10%, rgba(230, 178, 60, 0.1), transparent 55%),
-      linear-gradient(to bottom, rgba(244, 241, 234, 0.02) 1px, transparent 1px),
-      linear-gradient(to right, rgba(244, 241, 234, 0.02) 1px, transparent 1px);
-    background-size: 100% 100%, 64px 64px, 64px 64px;
+      radial-gradient(115% 85% at 50% -12%, var(--bg-2), transparent 60%),
+      radial-gradient(60% 40% at 82% 8%, color-mix(in srgb, var(--gold) 16%, transparent), transparent 70%);
     background-attachment: fixed;
+    transition: background-color .4s ease, color .4s ease;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-sans);
+  h1, h2, h3, h4, h5 {
+    font-family: var(--font-display);
+    font-weight: 700;
     letter-spacing: -0.02em;
-    font-weight: 600;
+    line-height: 1.04;
     margin: 0;
-  }
-
-  ::selection {
-    background: rgba(230, 178, 60, 0.28);
-    color: #fff;
+    color: var(--ink);
   }
 
   a { color: inherit; text-decoration: none; }
+  ::selection { background: color-mix(in srgb, var(--gold) 40%, transparent); color: var(--ink); }
 
   :focus-visible {
-    outline: 2px solid var(--color-gold);
+    outline: 2.5px solid var(--gold-3);
     outline-offset: 2px;
-    border-radius: 3px;
+    border-radius: 4px;
   }
+
+  img { max-width: 100%; height: auto; }
 }
 
+/* ---------------------------- Components --------------------------------- */
 @layer components {
-  /* -- Editorial serif, used with restraint -------------------------------- */
-  .serif {
-    font-family: var(--font-display);
-    font-weight: 400;
-    letter-spacing: -0.01em;
-  }
+  .wrap        { max-width: 1180px; margin-inline: auto; padding-inline: 24px; }
+  .wrap-narrow { max-width: 880px;  margin-inline: auto; padding-inline: 24px; }
 
-  /* -- Eyebrow label — structural, monospace, gold ------------------------- */
+  /* Eyebrow — structural label, mono, gold, tracked-out */
   .eyebrow {
+    display: inline-flex; align-items: center; gap: 9px;
     font-family: var(--font-mono);
-    font-size: 0.72rem;
-    letter-spacing: 0.28em;
-    text-transform: uppercase;
-    color: var(--color-gold);
-    font-weight: 500;
+    font-size: 0.72rem; font-weight: 500;
+    letter-spacing: 0.26em; text-transform: uppercase;
+    color: var(--gold-3);
   }
 
-  /* -- Panels — quiet glass, hairline border ------------------------------- */
+  /* Display helper */
+  .display { font-family: var(--font-display); font-weight: 800; letter-spacing: -0.03em; }
+
+  /* Panels — warm solid cards with a hairline + soft shadow */
   .panel {
-    background: color-mix(in srgb, var(--color-surface) 82%, transparent);
-    backdrop-filter: blur(16px);
-    border: 1px solid var(--color-line);
-    border-radius: 14px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-soft);
   }
+  .panel-2 { background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius); }
 
-  .panel-flat {
-    background: var(--color-ink-2);
-    border: 1px solid var(--color-line);
-    border-radius: 14px;
+  /* Signature: the "stamped" card — hard offset shadow, shifts on hover like
+     a letterpress plate pressing into paper. */
+  .card-stamp {
+    background: var(--surface);
+    border: 1.5px solid var(--hard);
+    border-radius: var(--radius);
+    box-shadow: 6px 6px 0 var(--hard);
+    transition: transform 160ms cubic-bezier(.2,.8,.2,1), box-shadow 160ms cubic-bezier(.2,.8,.2,1);
   }
+  .card-stamp:hover { transform: translate(-3px, -3px); box-shadow: 9px 9px 0 var(--hard); }
+  .card-stamp:active { transform: translate(2px, 2px); box-shadow: 3px 3px 0 var(--hard); }
 
-  /* -- Grade token — the semantic core. Set --g to a grade colour ---------- */
+  /* Letter-grade token — an inked certification chip */
   .grade {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--font-mono);
-    font-weight: 700;
-    line-height: 1;
-    color: var(--g, var(--color-gold));
-    background: color-mix(in srgb, var(--g, var(--color-gold)) 13%, transparent);
-    border: 1px solid color-mix(in srgb, var(--g, var(--color-gold)) 42%, transparent);
-    border-radius: 8px;
-    letter-spacing: -0.02em;
+    --g: var(--gold);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--font-display); font-weight: 800; line-height: 1;
+    color: var(--g);
+    background: color-mix(in srgb, var(--g) 12%, var(--surface));
+    border: 1.5px solid color-mix(in srgb, var(--g) 55%, transparent);
+    border-radius: 12px;
+    letter-spacing: -0.04em;
   }
-  .grade-a { --g: var(--color-grade-a); }
-  .grade-b { --g: var(--color-grade-b); }
-  .grade-c { --g: var(--color-grade-c); }
-  .grade-d { --g: var(--color-grade-d); }
-  .grade-f { --g: var(--color-grade-f); }
+  .grade-s { --g: var(--grade-s); }
+  .grade-a { --g: var(--grade-a); }
+  .grade-b { --g: var(--grade-b); }
+  .grade-c { --g: var(--grade-c); }
+  .grade-d { --g: var(--grade-d); }
+  .grade-f { --g: var(--grade-f); }
 
-  /* -- Pill — small status marker ------------------------------------------ */
+  /* Status pill */
   .pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 11px;
-    border-radius: 999px;
-    font-family: var(--font-mono);
-    font-size: 0.72rem;
-    letter-spacing: 0.04em;
-    border: 1px solid var(--color-line-strong);
-    color: var(--color-fg-dim);
-    background: rgba(244, 241, 234, 0.03);
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 4px 12px; border-radius: var(--radius-pill);
+    font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.03em;
+    border: 1px solid var(--line-strong); color: var(--ink-soft);
+    background: color-mix(in srgb, var(--ink) 4%, transparent);
   }
-  .pill-live { color: var(--color-grade-a); border-color: color-mix(in srgb, var(--color-grade-a) 40%, transparent); }
-  .pill-live .dot { background: var(--color-grade-a); box-shadow: 0 0 10px var(--color-grade-a); }
+  .pill-live { color: var(--grade-a); border-color: color-mix(in srgb, var(--grade-a) 45%, transparent); }
   .dot { width: 7px; height: 7px; border-radius: 999px; background: currentColor; }
+  .pill-live .dot { background: var(--grade-a); box-shadow: 0 0 0 0 color-mix(in srgb, var(--grade-a) 70%, transparent); animation: pulse 1.8s ease-out infinite; }
 
-  /* -- Buttons ------------------------------------------------------------- */
+  /* Buttons */
   .btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    height: 46px;
-    padding: 0 22px;
-    border-radius: 11px;
-    font-family: var(--font-sans);
-    font-weight: 600;
-    font-size: 0.95rem;
-    cursor: pointer;
-    border: 1px solid transparent;
-    transition: transform 120ms ease, background 200ms ease, border-color 200ms ease, box-shadow 200ms ease;
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    height: 48px; padding: 0 22px; border-radius: var(--radius-sm);
+    font-family: var(--font-sans); font-weight: 650; font-size: 0.95rem;
+    cursor: pointer; border: 1.5px solid transparent; white-space: nowrap;
+    transition: transform 150ms cubic-bezier(.2,.8,.2,1), box-shadow 150ms ease, background 200ms ease, border-color 200ms ease, color 200ms ease;
   }
   .btn-primary {
-    background: linear-gradient(180deg, var(--color-gold-bright), var(--color-gold));
-    color: #241a05;
-    box-shadow: 0 8px 30px rgba(230, 178, 60, 0.22);
+    background: var(--gold); color: var(--on-gold);
+    border-color: var(--hard);
+    box-shadow: 4px 4px 0 var(--hard);
   }
-  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(230, 178, 60, 0.34); }
+  .btn-primary:hover  { transform: translate(-2px,-2px); box-shadow: 6px 6px 0 var(--hard); background: var(--gold-2); }
+  .btn-primary:active { transform: translate(2px,2px);   box-shadow: 2px 2px 0 var(--hard); }
+  .btn-ink {
+    background: var(--ink); color: var(--bg);
+    border-color: var(--hard); box-shadow: 4px 4px 0 var(--hard);
+  }
+  .btn-ink:hover  { transform: translate(-2px,-2px); box-shadow: 6px 6px 0 var(--hard); }
+  .btn-ink:active { transform: translate(2px,2px);   box-shadow: 2px 2px 0 var(--hard); }
   .btn-ghost {
-    background: rgba(244, 241, 234, 0.03);
-    border-color: var(--color-line-strong);
-    color: var(--color-fg);
+    background: transparent; border-color: var(--line-strong); color: var(--ink);
   }
-  .btn-ghost:hover { border-color: var(--color-gold-deep); background: rgba(230, 178, 60, 0.06); }
+  .btn-ghost:hover { border-color: var(--gold-3); background: color-mix(in srgb, var(--gold) 8%, transparent); }
 
-  /* -- CTA panel — a quiet gold accent along the top ----------------------- */
-  .card-cta {
-    position: relative;
-    overflow: hidden;
-  }
-  .card-cta::before {
-    content: "";
-    position: absolute;
-    inset: 0 0 auto 0;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--color-gold), transparent);
-    opacity: 0.7;
-  }
-
-  /* -- Mono evidence receipt ---------------------------------------------- */
+  /* Mono evidence receipt */
   .receipt {
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    color: var(--color-fg-dim);
-    background: var(--color-ink);
-    border: 1px dashed var(--color-line-strong);
-    border-radius: 10px;
+    font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-soft);
+    background: var(--surface-2);
+    border: 1px dashed var(--line-strong); border-radius: 12px;
   }
-  .hash { color: var(--color-gold); }
+  .hash { color: var(--gold-3); }
+
+  /* Meter / score bar */
+  .meter { height: 8px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 9%, transparent); overflow: hidden; }
+  .meter > i { display: block; height: 100%; border-radius: 999px; background: var(--g, var(--gold)); }
 }
 
+/* ---------------------------- Utilities ---------------------------------- */
 @layer utilities {
-  .text-gradient-gold {
-    background: linear-gradient(180deg, #fff 0%, var(--color-gold) 130%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-  }
-  .wrap { max-width: 1140px; margin-inline: auto; padding-inline: 24px; }
-  .wrap-narrow { max-width: 860px; margin-inline: auto; padding-inline: 24px; }
+  .text-gold { color: var(--gold-3); }
+  .text-soft { color: var(--ink-soft); }
+  .text-mute { color: var(--ink-mute); }
+  .bg-surface { background: var(--surface); }
 
-  /* Seal stamp-down entrance */
-  @keyframes stamp {
-    0% { transform: scale(1.6) rotate(-14deg); opacity: 0; filter: blur(3px); }
-    60% { transform: scale(0.94) rotate(-8deg); opacity: 1; filter: blur(0); }
-    100% { transform: scale(1) rotate(-8deg); opacity: 1; }
+  .text-gradient-gold {
+    background: linear-gradient(100deg, var(--gold-3), var(--gold), var(--gold-2));
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
   }
-  .animate-stamp { animation: stamp 900ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+  /* Motion */
+  @keyframes stamp {
+    0%   { transform: scale(1.7) rotate(-16deg); opacity: 0; filter: blur(4px); }
+    55%  { transform: scale(.92) rotate(-7deg);  opacity: 1; filter: blur(0); }
+    72%  { transform: scale(1.03) rotate(-7deg); }
+    100% { transform: scale(1) rotate(-7deg); opacity: 1; }
+  }
+  .animate-stamp { animation: stamp 820ms cubic-bezier(.2,.8,.2,1) both; }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+  .animate-rise { animation: rise 680ms cubic-bezier(.2,.8,.2,1) both; }
+
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--grade-a) 65%, transparent); }
+    70%  { box-shadow: 0 0 0 7px transparent; }
+    100% { box-shadow: 0 0 0 0 transparent; }
+  }
 
   @keyframes spin-slow { to { transform: rotate(360deg); } }
-  .animate-spin-slow { animation: spin-slow 40s linear infinite; }
+  .animate-spin-slow { animation: spin-slow 44s linear infinite; }
 
-  @keyframes rise {
-    from { opacity: 0; transform: translateY(14px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  .animate-rise { animation: rise 700ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+  @keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+  .animate-marquee { animation: marquee 40s linear infinite; }
+
+  /* Scroll-reveal (paired with a tiny IntersectionObserver in the app) */
+  .reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s cubic-bezier(.2,.8,.2,1), transform .7s cubic-bezier(.2,.8,.2,1); }
+  .reveal.in { opacity: 1; transform: none; }
 
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
-      animation-duration: 0.001ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.001ms !important;
-      scroll-behavior: auto !important;
+      animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+      transition-duration: .001ms !important; scroll-behavior: auto !important;
     }
+    .reveal { opacity: 1; transform: none; }
   }
 }

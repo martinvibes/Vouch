@@ -1,28 +1,26 @@
 import { NextResponse } from "next/server";
 import { getAgent } from "@/lib/data";
 import { paymentRequired, verifyPayment, RATING_PRICE_USD } from "@/lib/x402";
-import { GRADE_MEANING, isCertified } from "@/lib/grade";
+import { GRADE_MEANING } from "@/lib/grade";
 
 /**
  * GET /api/vouch/{id}  — the pay-per-call rating endpoint.
  *
  * The machine-readable half of Vouch: an orchestrator about to hire an agent
- * asks Vouch first, pays $0.02 via x402, and gets back a grade + recommendation
- * + evidence pointer. Without payment it answers 402 with the requirements.
+ * asks Vouch first, settles $0.02 in USDC via x402, and gets back a grade, a
+ * one-word recommendation, and the real signals behind it. Without payment it
+ * answers 402 with the x402 requirements (payTo = Vouch's real ASP wallet).
  */
 
-function recommendation(score: number): "hire" | "verify" | "avoid" {
-  if (score >= 82) return "hire";
-  if (score >= 58) return "verify";
+function recommendation(score: number, proven: boolean): "hire" | "verify" | "avoid" {
+  if (score >= 80 && proven) return "hire";
+  if (score >= 52) return "verify";
   return "avoid";
 }
 
-export async function GET(
-  req: Request,
-  ctx: { params: Promise<{ id: string }> },
-) {
+export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  const agent = await getAgent(id);
+  const agent = getAgent(id);
 
   if (!agent) {
     return NextResponse.json(
@@ -51,29 +49,35 @@ export async function GET(
       category: agent.category,
       serviceType: agent.serviceType,
       priceModel: agent.priceModel,
+      communicationAddress: agent.communicationAddress || null,
     },
     rating: {
       grade: agent.grade,
       score: agent.score,
       rank: agent.rank,
-      certified: isCertified(agent.score),
-      reliability: agent.reliability,
-      trend: agent.trend,
+      certified: agent.certified,
+      confidence: agent.confidence,
+      proven: agent.proven,
       meaning: GRADE_MEANING[agent.grade],
     },
-    recommendation: recommendation(agent.score),
+    recommendation: recommendation(agent.score, agent.proven),
     criteria: agent.criteria,
     evidence: {
-      tasksAudited: agent.tasksRun,
-      lastAuditedAt: agent.lastAuditedAt,
-      latestSettlement: agent.tasks[0]?.txHash ?? null,
+      completedJobs: agent.signals.soldCount,
+      feedbackRate: agent.signals.feedbackRate,
+      securityRate: agent.signals.securityRate,
+      online: agent.signals.online,
+      receipts: agent.evidence,
       scorecard: `${url.origin}/agents/${agent.handle}`,
+      snapshotAt: agent.snapshotAt,
     },
     meta: {
       authority: "Vouch",
+      asp: "#5434",
+      network: "x-layer",
       pricePaidUsd: RATING_PRICE_USD,
       disclaimer:
-        "Independent rating from paid, on-chain mystery-shopping. Not investment advice.",
+        "Independent rating computed from real, published OKX.AI marketplace signals. Not investment advice.",
     },
   };
 

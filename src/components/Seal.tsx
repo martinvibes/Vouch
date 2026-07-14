@@ -5,10 +5,10 @@ import type { GradeLetter } from "@/lib/types";
 import { gradeColor } from "@/lib/grade";
 
 /**
- * The Vouch Seal — the brand's signature object. A rosette/notary stamp: a
- * ring of radial teeth, concentric hairlines, "VOUCH · CERTIFIED · AGENT"
- * curved along the rim, and the agent's letter grade struck in the centre.
- * It's what a ratings authority issues — an actual seal of approval.
+ * The Vouch Seal — the brand's signature object. A notary rosette: a ring of
+ * radial teeth, concentric hairlines, "VOUCH · CERTIFIED AGENT" curved along the
+ * rim, and the agent's letter grade struck in the centre. It's what a ratings
+ * authority issues — an actual seal of approval, in the grade's own colour.
  */
 export function Seal({
   grade,
@@ -29,26 +29,26 @@ export function Seal({
   const pathId = `seal-rim-${uid}`;
   const color = gradeColor(grade);
 
-  const c = 120; // viewBox centre
-  const rimR = 104; // text path radius
+  const c = 120;
+  const rimR = 104;
   const teeth = 60;
   const teethOuter = 116;
   const teethInner = 109;
 
+  // Round trig output to a fixed precision so the server (Node) and client
+  // (browser) serialize identical coordinate strings — otherwise last-ULP
+  // float differences trigger an SVG hydration mismatch.
+  const p = (n: number) => Math.round(n * 1000) / 1000;
   const teethLines = Array.from({ length: teeth }, (_, i) => {
     const a = (i / teeth) * Math.PI * 2;
-    const x1 = c + teethInner * Math.cos(a);
-    const y1 = c + teethInner * Math.sin(a);
-    const x2 = c + teethOuter * Math.cos(a);
-    const y2 = c + teethOuter * Math.sin(a);
     return (
       <line
         key={i}
-        x1={x1}
-        y1={y1}
-        x2={x2}
-        y2={y2}
-        stroke="var(--color-gold)"
+        x1={p(c + teethInner * Math.cos(a))}
+        y1={p(c + teethInner * Math.sin(a))}
+        x2={p(c + teethOuter * Math.cos(a))}
+        y2={p(c + teethOuter * Math.sin(a))}
+        stroke="var(--gold)"
         strokeWidth={i % 5 === 0 ? 2.4 : 1.2}
         strokeLinecap="round"
         opacity={0.9}
@@ -62,7 +62,7 @@ export function Seal({
       width={size}
       height={size}
       role="img"
-      aria-label={`Vouch grade ${grade}`}
+      aria-label={`Vouch grade ${grade}${score !== undefined ? `, ${score} out of 100` : ""}`}
       className={animate ? "animate-stamp" : undefined}
       style={{ overflow: "visible" }}
     >
@@ -73,52 +73,39 @@ export function Seal({
           fill="none"
         />
         <radialGradient id={`glow-${uid}`} cx="50%" cy="42%" r="60%">
-          <stop offset="0%" stopColor={color} stopOpacity="0.22" />
+          <stop offset="0%" stopColor={color} stopOpacity="0.24" />
           <stop offset="70%" stopColor={color} stopOpacity="0" />
         </radialGradient>
       </defs>
 
-      {/* Inner glow tinted by the grade */}
       <circle cx={c} cy={c} r="96" fill={`url(#glow-${uid})`} />
 
-      {/* Rosette teeth ring (optionally rotating) */}
-      <g
-        className={spin ? "animate-spin-slow" : undefined}
-        style={{ transformOrigin: "120px 120px" }}
-      >
+      <g className={spin ? "animate-spin-slow" : undefined} style={{ transformOrigin: "120px 120px" }}>
         {teethLines}
       </g>
 
-      {/* Concentric hairlines */}
-      <circle cx={c} cy={c} r="105" fill="none" stroke="var(--color-gold)" strokeWidth="1" opacity="0.5" />
-      <circle cx={c} cy={c} r="92" fill="none" stroke="var(--color-gold)" strokeWidth="1.4" opacity="0.8" />
-      <circle cx={c} cy={c} r="70" fill="none" stroke="var(--color-line-strong)" strokeWidth="1" />
+      <circle cx={c} cy={c} r="105" fill="none" stroke="var(--gold)" strokeWidth="1" opacity="0.5" />
+      <circle cx={c} cy={c} r="92" fill="none" stroke="var(--gold)" strokeWidth="1.4" opacity="0.85" />
+      <circle cx={c} cy={c} r="70" fill="none" stroke="var(--line-strong)" strokeWidth="1" />
 
-      {/* Curved rim text */}
       <text
-        fill="var(--color-gold)"
-        style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: "11.5px",
-          fontWeight: 600,
-          letterSpacing: "3.2px",
-        }}
+        fill="var(--gold-3)"
+        style={{ fontFamily: "var(--font-mono)", fontSize: "11.5px", fontWeight: 600, letterSpacing: "3.2px" }}
       >
         <textPath href={`#${pathId}`} startOffset="0%">
           VOUCH · CERTIFIED AGENT · VOUCH · CERTIFIED AGENT ·
         </textPath>
       </text>
 
-      {/* Centre grade */}
       <text
         x={c}
         y={score !== undefined ? c - 2 : c + 6}
         textAnchor="middle"
         fill={color}
         style={{
-          fontFamily: "var(--font-mono)",
-          fontSize: grade.length > 1 ? "50px" : "62px",
-          fontWeight: 700,
+          fontFamily: "var(--font-display)",
+          fontSize: grade.length > 1 ? "50px" : "64px",
+          fontWeight: 800,
           letterSpacing: "-2px",
         }}
       >
@@ -130,7 +117,7 @@ export function Seal({
           x={c}
           y={c + 30}
           textAnchor="middle"
-          fill="var(--color-fg-dim)"
+          fill="var(--ink-soft)"
           style={{ fontFamily: "var(--font-mono)", fontSize: "13px", letterSpacing: "1px" }}
         >
           {score}/100
@@ -142,7 +129,7 @@ export function Seal({
           x={c}
           y={c + 50}
           textAnchor="middle"
-          fill="var(--color-fg-mute)"
+          fill="var(--ink-mute)"
           style={{ fontFamily: "var(--font-mono)", fontSize: "8.5px", letterSpacing: "2px" }}
         >
           {subtitle.toUpperCase()}
