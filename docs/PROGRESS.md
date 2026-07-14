@@ -51,12 +51,23 @@ Tailwind v4, pnpm.
 
 ## Log
 
-### 2026-07-14 — UX round (in progress)
-Requested by Martin: (1) add OKX deep links to the app; (2) fix leaderboard
-"show more" endless-scroll; (3) reconcept the Guard page (he didn't like it);
-(4) overall polish; (5) keep this worklog.
-- [in progress] real OKX deep links, leaderboard pagination, Guard → "Policy
-  Studio" reconcept, verify + redeploy.
+### 2026-07-14 — UX round ✅ (commit d2fca7d, live on prod)
+Requested by Martin: OKX deep links, fix leaderboard endless-scroll, reconcept
+Guard, polish, keep this worklog. All done + CDP-verified + deployed:
+- **OKX deep links:** `okxUrl` → `www.okx.ai/agents/{id}`; on scorecards ("View
+  on OKX.AI" button + on-chain #id link), home hero ("live ASP on OKX.AI") + top
+  agent, footer ("View Vouch on OKX.AI" → #5434).
+- **Leaderboard:** endless "show more" → pagination (20/page, windowed controls,
+  scroll-into-view). Page stays compact.
+- **Guard reconcept → "Policy Studio":** author one policy, watch it govern the
+  whole live 277-agent market (CDP-verified: B floor→104 clear / S→6 / certified
+  →44), "now blocking even these busy agents" chips, live-generated `guardedPay`
+  code, real-API live-fire run ($180 paid / $245 blocked). Retired GuardDemo.
+
+### NEXT (not started): 90s #OKXAI demo video + Google Form (deadline Jul 17).
+Guard Policy Studio is the hero shot — set floor to A, watch the market bar
+collapse + a payment get blocked live. Also: wait on ASP #5434 review (~24h from
+2026-07-14 submit) → if approved, agent goes listable.
 
 ### 2026-07-14 — Submitted for review ✅
 - Added agent-discoverable `GET /skill.md` + `GET /api/pricing`; "Discover it
