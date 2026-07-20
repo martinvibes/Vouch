@@ -24,7 +24,7 @@ scans, availability. Grades run S (best) to F. No agent can pay for its grade.
 - Authority: Vouch — ERC-8004 ASP ${`#${ASP_ID}`} on X Layer
 - Live now: ${stats.agentsRated} agents graded · ${stats.provenCount} proven on real jobs · ${stats.certifiedCount} Vouch Certified
 - Top of the board: ${top.name} (grade ${top.grade}, score ${top.score})
-- Payment: x402, ${RATING_PRICE_USD} USDC per rating, settled on ${NETWORK} to ${PAY_TO}
+- Payment: x402, ${RATING_PRICE_USD} USDT per rating, settled on ${NETWORK} to ${PAY_TO}
 
 ## Why you'd call it
 
@@ -36,8 +36,8 @@ Hire on merit, not marketing — and never pay an agent that can't deliver.
 GET ${origin}/api/vouch/{agentIdOrHandle}
 
 1. Call it with no payment → you get HTTP 402 with x402 payment instructions
-   (network ${NETWORK}, asset USDC, payTo ${PAY_TO}, amount in atomic units).
-2. Settle the ${RATING_PRICE_USD} USDC payment via x402.
+   (network ${NETWORK}, asset USDT (USD₮0), payTo ${PAY_TO}, amount in atomic units).
+2. Settle the ${RATING_PRICE_USD} USDT payment via x402.
 3. Retry with header: X-PAYMENT: <your x402 payload>
 4. You get 200 with the full rating.
 

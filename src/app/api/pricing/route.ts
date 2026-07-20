@@ -3,7 +3,7 @@ import {
   RATING_PRICE_USD,
   RATING_PRICE_ATOMIC,
   PAY_TO,
-  USDC_XLAYER,
+  USDT0_XLAYER,
   NETWORK,
   ASP_ID,
 } from "@/lib/x402";
@@ -21,8 +21,8 @@ export function GET() {
       authority: "Vouch",
       asp: `#${ASP_ID}`,
       network: NETWORK,
-      currency: "USDC",
-      asset: USDC_XLAYER,
+      currency: "USDT",
+      asset: USDT0_XLAYER,
       payTo: PAY_TO,
       protocol: "x402",
       services: {

@@ -1,101 +1,280 @@
 /**
- * Minimal x402 ("HTTP 402 Payment Required") server helpers, shaped to match
- * the real protocol so the Vouch rating API is a drop-in paid endpoint on
- * OKX.AI. Flow:
+ * x402 ("HTTP 402 Payment Required") server implementation — standard-compliant
+ * and settled for real on X Layer. Flow:
  *
- *   1. Client GETs the resource with no payment  → 402 + `accepts` requirements
- *   2. Client retries with an `X-PAYMENT` header  → 200 + the resource, plus an
- *      `X-PAYMENT-RESPONSE` header carrying the settlement.
+ *   1. Client GETs the resource with no payment → 402 + base64 `PAYMENT-REQUIRED`
+ *      challenge header (what OKX's validators read) + JSON body `accepts`.
+ *   2. Client signs an EIP-3009 transferWithAuthorization from the challenge and
+ *      retries with the standard `X-PAYMENT` header.
+ *   3. We settle it on-chain ourselves (our operator wallet broadcasts the
+ *      authorization and pays gas) → 200 + resource + `X-PAYMENT-RESPONSE`
+ *      header carrying the real settlement txHash.
  *
- * In mock mode any non-empty `X-PAYMENT` header settles (deterministic hash).
- * Wired to the OKX Payment SDK, `verifyPayment` calls the facilitator instead.
+ * The token contract itself verifies the buyer's signature and enforces nonce
+ * uniqueness (authorizationState), so settlement is trustless and replay-proof
+ * without a database — important on serverless.
  */
 
-export const X402_VERSION = 1;
+import { ethers } from "ethers";
 
-/** Price of one rating lookup, in USDC atomic units (6 decimals) → $0.02. */
+/**
+ * x402 protocol version. MUST be 2: OKX's marketplace validator parses the
+ * base64 challenge with `@okxweb3/x402-core`'s zod schema, which pins
+ * `x402Version: z.literal(2)` and requires `resource` to be an OBJECT. A v1
+ * challenge fails that parse outright and the listing is rejected with
+ * "x402 standard validation failed" — regardless of whether payment works.
+ */
+export const X402_VERSION = 2;
+
+/** Price of one rating lookup, in USDT atomic units (6 decimals) → $0.02. */
 export const RATING_PRICE_ATOMIC = "20000";
 export const RATING_PRICE_USD = 0.02;
 
 /**
- * Vouch's receiving identity and the settlement asset on X Layer.
- * PAY_TO is Vouch's real Agentic Wallet address (ERC-8004 ASP #5434), so a
- * settled call pays the actual authority — no placeholder.
+ * Vouch's receiving identity and the settlement asset on X Layer mainnet.
+ * PAY_TO is Vouch's real Agentic Wallet address (ERC-8004 ASP #5434).
+ * USDT0 is the OKX task-system settlement token (supports EIP-3009); its
+ * EIP-712 domain is verified against the on-chain DOMAIN_SEPARATOR — buyers
+ * sign against extra {name, version}, so these MUST match the contract.
  */
 export const PAY_TO = "0x6f1b837d7c27f62e4b1bc72a41d02118e30e9af1";
-export const USDC_XLAYER = "0x74b7f16337b8972027f6196a17a631ac6de26d22";
-export const NETWORK = "x-layer";
+export const USDT0_XLAYER = "0x779ded0c9e1022225f8e0630b35a9b54be713736";
+export const USDT0_DOMAIN = { name: "USD₮0", version: "1" };
+export const NETWORK = "eip155:196";
+export const XLAYER_RPC = "https://xlayerrpc.okx.com";
 export const ASP_ID = "5434";
 
+/**
+ * One entry of `accepts[]`. Exactly the fields the OKX schema defines — no
+ * more. Extra keys are tolerated by the (non-strict) parser, but a lean entry
+ * is what has been proven to pass review, so we keep the wire shape minimal
+ * and put anything human-readable in `resource` instead.
+ */
 export interface PaymentRequirements {
   scheme: "exact";
   network: string;
-  maxAmountRequired: string;
-  resource: string;
-  description: string;
-  mimeType: string;
+  asset: string;
+  amount: string;
   payTo: string;
   maxTimeoutSeconds: number;
-  asset: string;
-  extra: { name: string; decimals: number };
+  extra: { name: string; version: string };
 }
 
-export function paymentRequired(resource: string, description: string) {
+export interface Challenge {
+  x402Version: number;
+  error: string;
+  resource: { url: string; description: string; mimeType: string };
+  accepts: PaymentRequirements[];
+}
+
+/** The v2 challenge served on every unpaid request, header and body alike. */
+export function paymentRequired(resource: string, description: string): Challenge {
   const requirements: PaymentRequirements = {
     scheme: "exact",
-    network: "x-layer",
-    maxAmountRequired: RATING_PRICE_ATOMIC,
-    resource,
-    description,
-    mimeType: "application/json",
+    network: NETWORK,
+    asset: USDT0_XLAYER,
+    amount: RATING_PRICE_ATOMIC,
     payTo: PAY_TO,
-    maxTimeoutSeconds: 60,
-    asset: USDC_XLAYER,
-    extra: { name: "USDC", decimals: 6 },
+    maxTimeoutSeconds: 300,
+    extra: { ...USDT0_DOMAIN },
   };
   return {
     x402Version: X402_VERSION,
     error: "X-PAYMENT header is required to call the Vouch rating API",
+    resource: {
+      url: resource,
+      description,
+      mimeType: "application/json",
+    },
     accepts: [requirements],
   };
 }
 
-export interface Settlement {
-  success: boolean;
-  txHash: string;
-  network: string;
-  payer: string;
+/**
+ * Fields older/bespoke clients read from the 402 JSON body. Merged into the
+ * body only — the header stays strictly v2 so the validator's parse is clean.
+ */
+export function legacyBodyFields(resource: string, description: string) {
+  return {
+    maxAmountRequired: RATING_PRICE_ATOMIC,
+    decimals: 6,
+    payTo: PAY_TO,
+    asset: USDT0_XLAYER,
+    network: NETWORK,
+    description,
+    resourceUrl: resource,
+  };
 }
 
-/** Deterministic settlement hash from the payment payload (mock facilitator). */
-function settlementHash(payment: string): string {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < payment.length; i++) {
-    h ^= payment.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  const hex = "0123456789abcdef";
-  let s = "0x";
-  let x = h >>> 0;
-  for (let i = 0; i < 64; i++) {
-    s += hex[x & 15];
-    x = (Math.imul(x, 1664525) + 1013904223) >>> 0;
-  }
-  return s;
+/** Base64 challenge for the PAYMENT-REQUIRED / X-PAYMENT-REQUIRED headers. */
+export function encodeChallenge(challenge: ReturnType<typeof paymentRequired>): string {
+  return Buffer.from(JSON.stringify(challenge)).toString("base64");
 }
 
 /**
- * Verify (and, in live mode, settle) a payment. Returns the settlement on
- * success, or null if the header is missing/invalid. Mock: accepts any
- * non-empty header. Live: hand `payment` to the OKX facilitator to verify the
- * signed x402 payload and broadcast settlement.
+ * The settlement receipt, shaped to the SDK's `settleResponseSchema` so the
+ * buyer's client can parse it out of the PAYMENT-RESPONSE header.
  */
-export function verifyPayment(paymentHeader: string | null): Settlement | null {
-  if (!paymentHeader || paymentHeader.trim().length === 0) return null;
-  return {
-    success: true,
-    txHash: settlementHash(paymentHeader),
-    network: "x-layer",
-    payer: "0x" + settlementHash(paymentHeader).slice(2, 42),
-  };
+export interface Settlement {
+  success: boolean;
+  status: "success";
+  transaction: string;
+  txHash: string; // legacy alias of `transaction`
+  network: string;
+  payer: string;
+  amount: string;
+}
+
+export type SettleOutcome = { ok: true; settlement: Settlement } | { ok: false; reason: string };
+
+interface ExactAuthorization {
+  from: string;
+  to: string;
+  value: string;
+  validAfter: string;
+  validBefore: string;
+  nonce: string;
+}
+
+const EIP3009_ABI = [
+  "function transferWithAuthorization(address from, address to, uint256 value, uint256 validAfter, uint256 validBefore, bytes32 nonce, uint8 v, bytes32 r, bytes32 s)",
+  "function authorizationState(address authorizer, bytes32 nonce) view returns (bool)",
+];
+
+const SETTLE_TIMEOUT_MS = 45_000;
+
+/**
+ * Parse the standard payment header: base64-encoded (or raw) JSON.
+ *
+ * v1 clients put `scheme`/`network` at the top level; v2 clients (including
+ * OKX's own `payment pay-local`) nest the chosen requirement under `accepted`.
+ * Both are read, so either generation of buyer settles.
+ */
+function parsePaymentHeader(header: string): {
+  scheme?: string;
+  network?: string;
+  accepted?: { scheme?: string; network?: string };
+  payload: { signature: string; authorization: ExactAuthorization };
+} | null {
+  for (const text of [Buffer.from(header, "base64").toString("utf8"), header]) {
+    try {
+      const obj = JSON.parse(text);
+      if (obj && typeof obj === "object" && obj.payload?.authorization && obj.payload?.signature) return obj;
+    } catch {
+      // not this encoding — try the next
+    }
+  }
+  return null;
+}
+
+/**
+ * Verify and settle a standard x402 "exact" payment on-chain. Returns the real
+ * settlement (with the on-chain txHash) on success, or the reason it can't
+ * settle. Fails closed if the operator key is not configured.
+ */
+export async function settlePayment(paymentHeader: string | null): Promise<SettleOutcome> {
+  if (!paymentHeader || paymentHeader.trim().length === 0) {
+    return { ok: false, reason: "missing X-PAYMENT header" };
+  }
+
+  const parsed = parsePaymentHeader(paymentHeader);
+  if (!parsed) {
+    return { ok: false, reason: "unrecognized payment header: expected standard x402 exact payload" };
+  }
+  const scheme = parsed.scheme ?? parsed.accepted?.scheme;
+  const network = parsed.network ?? parsed.accepted?.network;
+  if (scheme && scheme !== "exact") {
+    return { ok: false, reason: `unsupported scheme: ${scheme} (supported: exact)` };
+  }
+  if (network && network !== NETWORK && network !== "x-layer" && network !== "xlayer") {
+    return { ok: false, reason: `network mismatch: expected ${NETWORK}` };
+  }
+
+  const key = process.env.SETTLEMENT_PRIVATE_KEY?.trim();
+  if (!key) return { ok: false, reason: "settlement operator not configured" };
+
+  const auth = parsed.payload.authorization;
+  for (const f of ["from", "to", "value", "validAfter", "validBefore", "nonce"] as const) {
+    if (!auth[f]) return { ok: false, reason: `authorization missing field: ${f}` };
+  }
+  if (auth.to.toLowerCase() !== PAY_TO.toLowerCase()) {
+    return { ok: false, reason: `authorization.to must be ${PAY_TO}` };
+  }
+
+  let value: bigint;
+  try {
+    value = BigInt(auth.value);
+  } catch {
+    return { ok: false, reason: "authorization.value is not a valid integer" };
+  }
+  if (value < BigInt(RATING_PRICE_ATOMIC)) {
+    return { ok: false, reason: `insufficient amount: ${value} < required ${RATING_PRICE_ATOMIC}` };
+  }
+
+  const now = Math.floor(Date.now() / 1000);
+  if (now < Number(auth.validAfter) - 60) return { ok: false, reason: "authorization not yet valid" };
+  if (now > Number(auth.validBefore) - 6) return { ok: false, reason: "authorization expired" };
+
+  // Everything from here touches ethers/RPC — keep it inside try/catch so a
+  // config or network fault degrades to a 402-with-reason, never a hard 500.
+  let token: ethers.Contract;
+  try {
+    const provider = new ethers.JsonRpcProvider(XLAYER_RPC, 196, { batchMaxCount: 1, staticNetwork: true });
+    const signer = new ethers.Wallet(key, provider);
+    token = new ethers.Contract(USDT0_XLAYER, EIP3009_ABI, signer);
+  } catch (e: unknown) {
+    const err = e as { message?: string };
+    return { ok: false, reason: `settlement operator misconfigured: ${err?.message || String(e)}` };
+  }
+
+  // On-chain replay guard: the token tracks each (authorizer, nonce) pair.
+  try {
+    if (await token.authorizationState(auth.from, auth.nonce)) {
+      return { ok: false, reason: "authorization already used (replay)" };
+    }
+  } catch (e: unknown) {
+    const err = e as { message?: string };
+    return { ok: false, reason: `replay check failed: ${err?.message || String(e)}` };
+  }
+
+  let sig: ethers.Signature;
+  try {
+    sig = ethers.Signature.from(parsed.payload.signature);
+  } catch {
+    return { ok: false, reason: "malformed signature" };
+  }
+
+  const args = [auth.from, auth.to, value, BigInt(auth.validAfter), BigInt(auth.validBefore), auth.nonce, sig.v, sig.r, sig.s];
+
+  // Preflight (free): the token verifies the EIP-712 signature and buyer balance.
+  try {
+    await token.transferWithAuthorization.staticCall(...args);
+  } catch (e: unknown) {
+    const err = e as { reason?: string; shortMessage?: string; message?: string };
+    return { ok: false, reason: `settlement preflight failed: ${err?.reason || err?.shortMessage || err?.message || String(e)}` };
+  }
+
+  try {
+    const tx = await token.transferWithAuthorization(...args);
+    const receipt = await Promise.race([
+      tx.wait(1),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("settlement timed out")), SETTLE_TIMEOUT_MS)),
+    ]);
+    if (!receipt || receipt.status !== 1) return { ok: false, reason: "settlement transaction reverted" };
+    return {
+      ok: true,
+      settlement: {
+        success: true,
+        status: "success",
+        transaction: tx.hash,
+        txHash: tx.hash,
+        network: NETWORK,
+        payer: ethers.getAddress(auth.from),
+        amount: value.toString(),
+      },
+    };
+  } catch (e: unknown) {
+    const err = e as { reason?: string; shortMessage?: string; message?: string };
+    return { ok: false, reason: `settlement failed: ${err?.reason || err?.shortMessage || err?.message || String(e)}` };
+  }
 }
