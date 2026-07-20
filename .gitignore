@@ -34,3 +34,6 @@ next-env.d.ts
 .vscode/
 .idea/
 .vercel
+
+# pulled Vercel env for the Railway migration (secrets)
+.env.railway
