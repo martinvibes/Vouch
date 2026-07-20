@@ -7,6 +7,7 @@ import {
   settlePayment,
   RATING_PRICE_USD,
   NETWORK,
+  ASP_ID,
 } from "@/lib/x402";
 import { GRADE_MEANING } from "@/lib/grade";
 
@@ -22,13 +23,20 @@ export const maxDuration = 60;
  * asks Vouch first, settles $0.02 in USDT0 via x402, and gets back a grade, a
  * one-word recommendation, and the real signals behind it.
  *
- * The one inviolable rule here: **an unpaid request always answers 402 with the
- * challenge** — every method, every body, every id. Marketplace validators
- * fuzz this endpoint (malformed JSON, wrong content-type, garbage payment
- * headers, bare GETs), and any other status reads to them as "the endpoint
- * does not implement x402" and fails the listing. Equally, nothing after a
- * successful payment may 4xx: the buyer's money is already spent on-chain, so
- * even a miss resolves to a 200 that says so.
+ * Two inviolable rules here.
+ *
+ * **An unpaid request always answers 402 with the challenge** — every method,
+ * every body, every id. Marketplace validators fuzz this endpoint (malformed
+ * JSON, wrong content-type, garbage payment headers, bare GETs), and any other
+ * status reads to them as "the endpoint does not implement x402".
+ *
+ * **The buyer is charged only for a rating actually delivered.** Settlement is
+ * the last thing that happens: the result is resolved and the whole response
+ * assembled first, and only then is the authorization broadcast. A query we
+ * have no rating for never reaches settlement at all — the authorization is
+ * simply not used, so no funds move and there is nothing to refund. Ordering
+ * these the other way round is what failed review on 2026-07-20 ("fees are
+ * still charged to users when the service fails to return results").
  */
 
 function recommendation(score: number, proven: boolean): "hire" | "verify" | "avoid" {
@@ -50,7 +58,53 @@ function publicOrigin(req: Request): string {
 }
 
 const EXPOSE_HEADERS =
-  "Payment-Required, X-Payment-Required, Payment-Response, X-Payment-Response";
+  "Payment-Required, X-Payment-Required, Payment-Response, X-Payment-Response, X-Payment-Settled";
+
+const DISCLAIMER =
+  "Independent rating computed from real, published OKX.AI marketplace signals. Not investment advice.";
+
+type Agent = NonNullable<ReturnType<typeof getAgent>>;
+
+/**
+ * The paid deliverable, assembled from data already in hand. Deliberately
+ * pure and synchronous: it is built before settlement so that once funds
+ * move, returning the result cannot fail.
+ */
+function ratingBody(agent: Agent, req: Request) {
+  return {
+    found: true,
+    charged: true,
+    agent: {
+      id: agent.id,
+      name: agent.name,
+      handle: agent.handle,
+      category: agent.category,
+      serviceType: agent.serviceType,
+      priceModel: agent.priceModel,
+      communicationAddress: agent.communicationAddress || null,
+    },
+    rating: {
+      grade: agent.grade,
+      score: agent.score,
+      rank: agent.rank,
+      certified: agent.certified,
+      confidence: agent.confidence,
+      proven: agent.proven,
+      meaning: GRADE_MEANING[agent.grade],
+    },
+    recommendation: recommendation(agent.score, agent.proven),
+    criteria: agent.criteria,
+    evidence: {
+      completedJobs: agent.signals.soldCount,
+      feedbackRate: agent.signals.feedbackRate,
+      securityRate: agent.signals.securityRate,
+      online: agent.signals.online,
+      receipts: agent.evidence,
+      scorecard: `${publicOrigin(req)}/agents/${agent.handle}`,
+      snapshotAt: agent.snapshotAt,
+    },
+  };
+}
 
 async function handle(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
@@ -85,6 +139,45 @@ async function handle(req: Request, ctx: { params: Promise<{ id: string }> }) {
     return NextResponse.json(challengeBody, { status: 402, headers: challengeHeaders });
   }
 
+  // Nothing to sell → nothing to charge. The buyer's authorization is simply
+  // never broadcast, so no funds move and there is nothing to refund. This
+  // check MUST stay ahead of settlePayment: settling first and discovering the
+  // miss afterwards is what charged reviewers for an empty result.
+  if (!agent) {
+    return NextResponse.json(
+      {
+        found: false,
+        charged: false,
+        query: id,
+        rating: null,
+        message: `No rating on file for '${id}', so you were not charged — the payment authorization was received but never settled, and no funds moved. Vouch grades agents published on the OKX.AI marketplace; pass a marketplace handle or agent id.`,
+        meta: {
+          authority: "Vouch",
+          asp: `#${ASP_ID}`,
+          network: NETWORK,
+          amountCharged: 0,
+          settlement: null,
+          disclaimer: DISCLAIMER,
+        },
+      },
+      {
+        status: 200,
+        headers: {
+          // No PAYMENT-RESPONSE: there is no settlement to report. The explicit
+          // header says so, for clients that read headers rather than bodies.
+          "X-Payment-Settled": "false",
+          "Access-Control-Expose-Headers": EXPOSE_HEADERS,
+          "Cache-Control": "no-store",
+        },
+      },
+    );
+  }
+
+  // The whole response is assembled BEFORE settlement, so there is no step
+  // between "money moved" and "result returned" that can fail and leave the
+  // buyer paying for nothing.
+  const body = ratingBody(agent, req);
+
   const outcome = await settlePayment(paymentHeader);
   if (!outcome.ok) {
     // A payment that can't settle gets a fresh challenge, never a 400 — the
@@ -99,71 +192,21 @@ async function handle(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const paidHeaders = {
     "PAYMENT-RESPONSE": receipt,
     "X-Payment-Response": receipt,
+    "X-Payment-Settled": "true",
     "Access-Control-Expose-Headers": EXPOSE_HEADERS,
     "Cache-Control": "no-store",
   };
 
   const meta = {
     authority: "Vouch",
-    asp: "#5434",
+    asp: `#${ASP_ID}`,
     network: NETWORK,
-    pricePaidUsd: RATING_PRICE_USD,
+    amountCharged: RATING_PRICE_USD,
     settlement: { transaction: settlement.transaction, payer: settlement.payer },
-    disclaimer:
-      "Independent rating computed from real, published OKX.AI marketplace signals. Not investment advice.",
+    disclaimer: DISCLAIMER,
   };
 
-  // Paid, but nothing on file for that id. The lookup was performed and the
-  // payment is already settled on-chain, so this answers 200 with an explicit
-  // negative result rather than burning the buyer with a 404.
-  if (!agent) {
-    return NextResponse.json(
-      {
-        found: false,
-        query: id,
-        rating: null,
-        message: `No rating on file for '${id}'. Vouch grades agents published on the OKX.AI marketplace — pass a marketplace handle or agent id.`,
-        meta,
-      },
-      { status: 200, headers: paidHeaders },
-    );
-  }
-
-  const body = {
-    found: true,
-    agent: {
-      id: agent.id,
-      name: agent.name,
-      handle: agent.handle,
-      category: agent.category,
-      serviceType: agent.serviceType,
-      priceModel: agent.priceModel,
-      communicationAddress: agent.communicationAddress || null,
-    },
-    rating: {
-      grade: agent.grade,
-      score: agent.score,
-      rank: agent.rank,
-      certified: agent.certified,
-      confidence: agent.confidence,
-      proven: agent.proven,
-      meaning: GRADE_MEANING[agent.grade],
-    },
-    recommendation: recommendation(agent.score, agent.proven),
-    criteria: agent.criteria,
-    evidence: {
-      completedJobs: agent.signals.soldCount,
-      feedbackRate: agent.signals.feedbackRate,
-      securityRate: agent.signals.securityRate,
-      online: agent.signals.online,
-      receipts: agent.evidence,
-      scorecard: `${publicOrigin(req)}/agents/${agent.handle}`,
-      snapshotAt: agent.snapshotAt,
-    },
-    meta,
-  };
-
-  return NextResponse.json(body, { status: 200, headers: paidHeaders });
+  return NextResponse.json({ ...body, meta }, { status: 200, headers: paidHeaders });
 }
 
 // Validators probe with both verbs (and fuzz the POST body). Neither handler

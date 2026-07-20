@@ -117,7 +117,8 @@ export function encodeChallenge(challenge: ReturnType<typeof paymentRequired>): 
  */
 export interface Settlement {
   success: boolean;
-  status: "success";
+  /** Matches the SDK's settleResponseSchema, which allows a pending receipt. */
+  status: "success" | "pending";
   transaction: string;
   txHash: string; // legacy alias of `transaction`
   network: string;
@@ -254,27 +255,52 @@ export async function settlePayment(paymentHeader: string | null): Promise<Settl
     return { ok: false, reason: `settlement preflight failed: ${err?.reason || err?.shortMessage || err?.message || String(e)}` };
   }
 
+  // Broadcast. Everything above this line can fail closed at no cost to the
+  // buyer; nothing below it can. Once the authorization is on the wire the
+  // buyer's funds are committed, so from here the only acceptable outcomes are
+  // "delivered" or "provably reverted" — reporting failure because we got
+  // bored waiting would charge them for nothing, which is what failed review
+  // on 2026-07-20.
+  let tx: ethers.ContractTransactionResponse;
   try {
-    const tx = await token.transferWithAuthorization(...args);
-    const receipt = await Promise.race([
-      tx.wait(1),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("settlement timed out")), SETTLE_TIMEOUT_MS)),
-    ]);
-    if (!receipt || receipt.status !== 1) return { ok: false, reason: "settlement transaction reverted" };
-    return {
-      ok: true,
-      settlement: {
-        success: true,
-        status: "success",
-        transaction: tx.hash,
-        txHash: tx.hash,
-        network: NETWORK,
-        payer: ethers.getAddress(auth.from),
-        amount: value.toString(),
-      },
-    };
+    tx = await token.transferWithAuthorization(...args);
   } catch (e: unknown) {
     const err = e as { reason?: string; shortMessage?: string; message?: string };
     return { ok: false, reason: `settlement failed: ${err?.reason || err?.shortMessage || err?.message || String(e)}` };
+  }
+
+  const settled = (status: Settlement["status"]): SettleOutcome => ({
+    ok: true,
+    settlement: {
+      success: true,
+      status,
+      transaction: tx.hash,
+      txHash: tx.hash,
+      network: NETWORK,
+      payer: ethers.getAddress(auth.from),
+      amount: value.toString(),
+    },
+  });
+
+  try {
+    const receipt = await Promise.race([
+      tx.wait(1),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), SETTLE_TIMEOUT_MS)),
+    ]);
+    // Slow confirmation, not a failure: X Layer has the transaction and it
+    // will land. The buyer gets what they paid for, and the receipt says
+    // "pending" so their client can confirm the hash itself.
+    if (receipt === null) return settled("pending");
+    if (receipt.status !== 1) return { ok: false, reason: "settlement transaction reverted" };
+    return settled("success");
+  } catch (e: unknown) {
+    // Broadcast succeeded but we lost the RPC while waiting. Same reasoning:
+    // the transaction exists, so deliver against it rather than charging the
+    // buyer for an error that is ours.
+    const err = e as { reason?: string; shortMessage?: string; message?: string };
+    if (err?.reason === "reverted" || /revert/i.test(err?.message ?? "")) {
+      return { ok: false, reason: "settlement transaction reverted" };
+    }
+    return settled("pending");
   }
 }

@@ -39,7 +39,13 @@ GET ${origin}/api/vouch/{agentIdOrHandle}
    (network ${NETWORK}, asset USDT (USD₮0), payTo ${PAY_TO}, amount in atomic units).
 2. Settle the ${RATING_PRICE_USD} USDT payment via x402.
 3. Retry with header: X-PAYMENT: <your x402 payload>
+   (OKX's own buyer sends PAYMENT-SIGNATURE; both are accepted.)
 4. You get 200 with the full rating.
+
+You are charged only when a rating is returned. If Vouch has no rating for
+what you asked about, your payment authorization is never settled — no funds
+move, so there is nothing to refund — and you get 200 with "charged": false
+and the header X-Payment-Settled: false.
 
 Response shape:
 {
@@ -48,7 +54,8 @@ Response shape:
   "recommendation": "hire" | "verify" | "avoid",
   "criteria": [ { "key", "score" } ],   // per rubric signal
   "evidence": { "completedJobs", "feedbackRate", "securityRate", "online", "receipts", "scorecard", "snapshotAt" },
-  "meta":    { "authority", "asp", "network", "pricePaidUsd", "disclaimer" }
+  "found": true, "charged": true,
+  "meta":    { "authority", "asp", "network", "amountCharged", "settlement", "disclaimer" }
 }
 
 ## Free endpoints
