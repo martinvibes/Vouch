@@ -23,7 +23,18 @@ export const maxDuration = 60;
  * asks Vouch first, settles $0.02 in USDT0 via x402, and gets back a grade, a
  * one-word recommendation, and the real signals behind it.
  *
- * Two inviolable rules here.
+ * Three inviolable rules here.
+ *
+ * **Rate the agent the buyer asked for — never a different one.** The requested
+ * target arrives in the task body or query (the way every OKX service takes its
+ * input, e.g. `POST /compute/infer {prompt}`), NOT only in the URL path. The
+ * registered endpoint path is fixed, so reading the target from the path alone
+ * rated the same hardcoded agent for every buyer and mislabelled it "hire" for
+ * whoever they actually asked about — the exact failure that was rejected on
+ * 2026-07-21. `resolveTarget()` reads body → query → path, and the response
+ * echoes both what was requested and what was resolved so the buyer can confirm
+ * the rating matches the ask. A requested agent we don't have is a clear
+ * not-found, never a substitution.
  *
  * **An unpaid request always answers 402 with the challenge** — every method,
  * every body, every id. Marketplace validators fuzz this endpoint (malformed
@@ -38,6 +49,79 @@ export const maxDuration = 60;
  * these the other way round is what failed review on 2026-07-20 ("fees are
  * still charged to users when the service fails to return results").
  */
+
+// Path segments that name the service itself, not an agent to rate. Hitting
+// `/api/vouch/rate` means "rate whoever is named in the body/query", so these
+// never resolve as a target — the buyer's actual request must come from there.
+const RESERVED_PATH = new Set(["rate", "lookup", "rating", "check", "vouch", ""]);
+
+// Field names a buyer might use for "which agent", across body and query. OKX's
+// task content lands in the request body; we read a generous set so we resolve
+// the target however the caller labelled it rather than ignoring it.
+const TARGET_FIELDS = ["target", "agentId", "agent_id", "handle", "agent", "query", "q", "name", "id"];
+const TARGET_WRAPPERS = ["content", "input", "params", "parameters", "data", "payload", "task", "arguments"];
+
+/**
+ * The agent the buyer is asking about. Read, in order, from: the request body
+ * (JSON, including one level of task/content wrapping, or a bare string); the
+ * query string; and finally the URL path (unless the path is the service name).
+ *
+ * Every branch is defensive: a missing, empty, or malformed body must never
+ * throw — it just means "no target here, try the next source" — so this cannot
+ * turn a fuzzed request into a 400 or 500.
+ */
+async function resolveTarget(req: Request, pathId: string): Promise<{ value: string | null; source: string }> {
+  const pick = (o: unknown): string | null => {
+    if (!o || typeof o !== "object") return null;
+    const rec = o as Record<string, unknown>;
+    for (const f of TARGET_FIELDS) {
+      const v = rec[f];
+      if (typeof v === "string" && v.trim()) return v.trim();
+    }
+    return null;
+  };
+
+  // 1. Body — where OKX puts task content.
+  try {
+    const text = await req.text();
+    if (text && text.trim()) {
+      try {
+        const obj: unknown = JSON.parse(text);
+        if (typeof obj === "string" && obj.trim()) return { value: obj.trim(), source: "body" };
+        const direct = pick(obj);
+        if (direct) return { value: direct, source: "body" };
+        if (obj && typeof obj === "object") {
+          for (const w of TARGET_WRAPPERS) {
+            const nested = pick((obj as Record<string, unknown>)[w]);
+            if (nested) return { value: nested, source: `body.${w}` };
+          }
+        }
+      } catch {
+        // Not JSON. A short plain-text body is taken as the target itself.
+        const t = text.trim();
+        if (t.length <= 128 && !t.includes("{") && !t.includes("=")) return { value: t, source: "body" };
+      }
+    }
+  } catch {
+    // No readable body — fine, fall through.
+  }
+
+  // 2. Query string.
+  try {
+    const params = new URL(req.url).searchParams;
+    for (const f of TARGET_FIELDS) {
+      const v = params.get(f);
+      if (v && v.trim()) return { value: v.trim(), source: "query" };
+    }
+  } catch {
+    // Malformed URL — fall through.
+  }
+
+  // 3. Path, unless it's the service name (a parameterized endpoint like /rate).
+  if (pathId && !RESERVED_PATH.has(pathId.toLowerCase())) return { value: pathId, source: "path" };
+
+  return { value: null, source: "none" };
+}
 
 function recommendation(score: number, proven: boolean): "hire" | "verify" | "avoid" {
   if (score >= 80 && proven) return "hire";
@@ -70,10 +154,14 @@ type Agent = NonNullable<ReturnType<typeof getAgent>>;
  * pure and synchronous: it is built before settlement so that once funds
  * move, returning the result cannot fail.
  */
-function ratingBody(agent: Agent, req: Request) {
+function ratingBody(agent: Agent, req: Request, requested: string) {
   return {
     found: true,
     charged: true,
+    // Echo the ask and what it resolved to, so the buyer can confirm the rating
+    // is about the agent they requested — never a silent substitution.
+    requested,
+    resolved: { id: agent.id, name: agent.name, handle: agent.handle },
     agent: {
       id: agent.id,
       name: agent.name,
@@ -106,17 +194,53 @@ function ratingBody(agent: Agent, req: Request) {
   };
 }
 
+// One JSON shape for "paid nothing, delivered nothing" — a miss that must not
+// charge. Headers say the same for clients that read headers not bodies.
+function notFound(requested: string | null, message: string) {
+  return NextResponse.json(
+    {
+      found: false,
+      charged: false,
+      requested,
+      resolved: null,
+      rating: null,
+      message,
+      meta: {
+        authority: "Vouch",
+        asp: `#${ASP_ID}`,
+        network: NETWORK,
+        amountCharged: 0,
+        settlement: null,
+        disclaimer: DISCLAIMER,
+      },
+    },
+    {
+      status: 200,
+      headers: {
+        "X-Payment-Settled": "false",
+        "Access-Control-Expose-Headers": EXPOSE_HEADERS,
+        "Cache-Control": "no-store",
+      },
+    },
+  );
+}
+
 async function handle(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
-  const agent = getAgent(id);
+
+  // Which agent does the buyer actually want? Body first (where OKX puts task
+  // content), then query, then path. Reading the body here also consumes it, so
+  // it must happen before anything else touches the request.
+  const target = await resolveTarget(req, id);
+  const agent = target.value ? getAgent(target.value) : undefined;
 
   const resource = `${publicOrigin(req)}/api/vouch/${id}`;
   const description = agent
     ? `Vouch rating for ${agent.name} (${agent.handle})`
-    : `Vouch rating lookup for '${id}'`;
+    : "Vouch rating — pass the target agent's handle or id in the request body or query";
 
-  // Build the challenge before anything can fail. An unknown id is NOT a 404
-  // here: the challenge is served first and the lookup result is delivered
+  // Build the challenge before anything can fail. An unknown target is NOT a
+  // 404 here: the challenge is served first and the lookup result is delivered
   // after payment, so a probe against any path shape still sees valid x402.
   const challenge = paymentRequired(resource, description);
   const encoded = encodeChallenge(challenge);
@@ -139,44 +263,31 @@ async function handle(req: Request, ctx: { params: Promise<{ id: string }> }) {
     return NextResponse.json(challengeBody, { status: 402, headers: challengeHeaders });
   }
 
-  // Nothing to sell → nothing to charge. The buyer's authorization is simply
-  // never broadcast, so no funds move and there is nothing to refund. This
-  // check MUST stay ahead of settlePayment: settling first and discovering the
-  // miss afterwards is what charged reviewers for an empty result.
+  // Paid, but the buyer named no agent. Nothing to rate → no charge.
+  if (!target.value) {
+    return notFound(
+      null,
+      "No target agent specified, so you were not charged. Ask for a specific agent by passing its marketplace handle or agent id — in the JSON body as {\"target\": \"<handle-or-id>\"}, as ?target=<handle-or-id>, or in the URL path.",
+    );
+  }
+
+  // Paid, but we have no rating for the agent they asked for. A clear not-found
+  // for THAT agent — never a rating for some other agent. The authorization is
+  // never broadcast, so no funds move and there is nothing to refund. This must
+  // stay ahead of settlePayment: settling first is what charged reviewers for a
+  // result they did not receive.
   if (!agent) {
-    return NextResponse.json(
-      {
-        found: false,
-        charged: false,
-        query: id,
-        rating: null,
-        message: `No rating on file for '${id}', so you were not charged — the payment authorization was received but never settled, and no funds moved. Vouch grades agents published on the OKX.AI marketplace; pass a marketplace handle or agent id.`,
-        meta: {
-          authority: "Vouch",
-          asp: `#${ASP_ID}`,
-          network: NETWORK,
-          amountCharged: 0,
-          settlement: null,
-          disclaimer: DISCLAIMER,
-        },
-      },
-      {
-        status: 200,
-        headers: {
-          // No PAYMENT-RESPONSE: there is no settlement to report. The explicit
-          // header says so, for clients that read headers rather than bodies.
-          "X-Payment-Settled": "false",
-          "Access-Control-Expose-Headers": EXPOSE_HEADERS,
-          "Cache-Control": "no-store",
-        },
-      },
+    return notFound(
+      target.value,
+      `No rating on file for '${target.value}', so you were not charged. Vouch grades agents published on the OKX.AI marketplace; check the handle or agent id and try again. You were NOT given a rating for a different agent.`,
     );
   }
 
   // The whole response is assembled BEFORE settlement, so there is no step
   // between "money moved" and "result returned" that can fail and leave the
-  // buyer paying for nothing.
-  const body = ratingBody(agent, req);
+  // buyer paying for nothing. It echoes the requested target and what it
+  // resolved to.
+  const body = ratingBody(agent, req, target.value);
 
   const outcome = await settlePayment(paymentHeader);
   if (!outcome.ok) {
@@ -209,8 +320,9 @@ async function handle(req: Request, ctx: { params: Promise<{ id: string }> }) {
   return NextResponse.json({ ...body, meta }, { status: 200, headers: paidHeaders });
 }
 
-// Validators probe with both verbs (and fuzz the POST body). Neither handler
-// reads the request body at all, so a malformed one cannot produce a 400.
+// Validators probe with both verbs (and fuzz the POST body). resolveTarget()
+// wraps every body read in try/catch, so a malformed body yields "no target",
+// never a 400.
 export const GET = handle;
 export const POST = handle;
 

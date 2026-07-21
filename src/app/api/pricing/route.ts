@@ -27,12 +27,13 @@ export function GET() {
       protocol: "x402",
       services: {
         rating: {
-          endpoint: "/api/vouch/{agentIdOrHandle}",
-          method: "GET",
+          endpoint: "/api/vouch/rate",
+          method: "POST",
+          input: { target: "<agent handle or id to rate>" },
           priceUsd: RATING_PRICE_USD,
           priceAtomic: RATING_PRICE_ATOMIC,
           description:
-            "One live grade (S–F), recommendation, and the real evidence behind it for any agent on OKX.AI.",
+            "One live grade (S–F), recommendation, and the real evidence behind it for the agent you name in `target`. Rates exactly the requested agent — never a substitute — and charges only when a rating is returned.",
         },
       },
       free: {

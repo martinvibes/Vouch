@@ -9,7 +9,12 @@ import { RATING_PRICE_USD, PAY_TO, NETWORK, ASP_ID } from "@/lib/x402";
  * markdown so a model can read it directly, the way OKX.AI skills are consumed.
  */
 export function GET(req: Request) {
-  const origin = new URL(req.url).origin;
+  // Behind Railway's proxy the request URL is the internal bind (0.0.0.0:8080);
+  // the forwarded headers carry the public origin buyers actually call.
+  const url = new URL(req.url);
+  const host = req.headers.get("x-forwarded-host") || req.headers.get("host") || url.host;
+  const proto = (req.headers.get("x-forwarded-proto") || url.protocol.replace(":", "")).split(",")[0].trim();
+  const origin = `${proto}://${host}`;
   const stats = getStats();
   const top = getTop(1)[0];
 
@@ -33,28 +38,39 @@ Hire on merit, not marketing — and never pay an agent that can't deliver.
 
 ## The rating endpoint (paid)
 
-GET ${origin}/api/vouch/{agentIdOrHandle}
+POST ${origin}/api/vouch/rate
 
-1. Call it with no payment → you get HTTP 402 with x402 payment instructions
+You name the agent you want rated. Pass its marketplace handle or agent id as
+"target" — in the JSON body (preferred), as a ?target= query param, or as the
+last URL path segment. Vouch rates exactly that agent and never substitutes a
+different one.
+
+  POST ${origin}/api/vouch/rate
+  { "target": "<handle-or-agentId>" }
+
+1. Call it with no payment → HTTP 402 with x402 payment instructions
    (network ${NETWORK}, asset USDT (USD₮0), payTo ${PAY_TO}, amount in atomic units).
 2. Settle the ${RATING_PRICE_USD} USDT payment via x402.
 3. Retry with header: X-PAYMENT: <your x402 payload>
    (OKX's own buyer sends PAYMENT-SIGNATURE; both are accepted.)
-4. You get 200 with the full rating.
+4. You get 200 with the full rating for the agent you asked for.
 
-You are charged only when a rating is returned. If Vouch has no rating for
-what you asked about, your payment authorization is never settled — no funds
-move, so there is nothing to refund — and you get 200 with "charged": false
-and the header X-Payment-Settled: false.
+You are charged only when a rating is returned. If Vouch has no rating for the
+agent you named (or you named none), your payment authorization is never
+settled — no funds move, nothing to refund — and you get 200 with
+"charged": false, "found": false, and the header X-Payment-Settled: false.
+You are never charged for, or shown, a rating about a different agent.
 
-Response shape:
+Response shape (success):
 {
+  "found": true, "charged": true,
+  "requested": "<what you asked for>",
+  "resolved":  { "id", "name", "handle" },   // confirm this matches your request
   "agent":   { "id", "name", "handle", "category", "serviceType", "priceModel" },
   "rating":  { "grade": "S..F", "score": 0-100, "rank", "certified", "confidence", "proven", "meaning" },
   "recommendation": "hire" | "verify" | "avoid",
   "criteria": [ { "key", "score" } ],   // per rubric signal
   "evidence": { "completedJobs", "feedbackRate", "securityRate", "online", "receipts", "scorecard", "snapshotAt" },
-  "found": true, "charged": true,
   "meta":    { "authority", "asp", "network", "amountCharged", "settlement", "disclaimer" }
 }
 
