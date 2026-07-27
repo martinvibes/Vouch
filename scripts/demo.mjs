@@ -101,10 +101,10 @@ async function rate(target) {
   say(`pay to  ${req.payTo}`);
   await pause(1100);
 
-  step("③", `Paying — OKX signs the authorization and settles it on X Layer`);
+  step("③", `Signing the payment — OKX authorizes $0.02 inside its secure enclave`);
   const pay = sign(challenge);
   say(`payer   ${pay.wallet}`);
-  say(`${C.dim}no private key touched this script — signed inside OKX's secure enclave${C.reset}`);
+  say(`${C.dim}a signed authorization, not a charge — nothing moves until Vouch settles it${C.reset}`);
   await pause(900);
 
   const paid = await fetchJson({
@@ -116,7 +116,7 @@ async function rate(target) {
 
   if (!b.found || !b.charged) {
     step("✗", `Vouch has no rating for "${target}"`);
-    say(`${C.green}charged: ${b.charged}${C.reset}  — your money never moved`);
+    say(`${C.green}charged: ${b.charged}${C.reset}  — the authorization was never broadcast, so no money moved`);
     say(b.message || "");
     return;
   }
@@ -139,6 +139,7 @@ async function rate(target) {
   console.log("");
   say(`evidence  ${b.evidence.completedJobs} settled jobs · ${b.evidence.feedbackRate}% feedback · security ${b.evidence.securityRate}`);
   if (tx) {
+    say(`${C.dim}$0.02 settles now — only because a real rating came back${C.reset}`);
     say(`settled   ${C.blue}${tx}${C.reset}`);
     say(`on-chain  ${C.blue}https://www.oklink.com/xlayer/tx/${tx}${C.reset}`);
   }
